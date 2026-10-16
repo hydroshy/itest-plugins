@@ -1,0 +1,37 @@
+{
+  "id": "hello-world",
+  "name": "Hello World Example Plugin",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    {
+      "name": "greeting:generate",
+      "version": "1.0.0",
+      "description": "Generates greeting messages"
+    }
+  ],
+  "permissions": [
+    {
+      "namespace": "core",
+      "resource": "device",
+      "action": "read",
+      "description": "Read device status"
+    }
+  ],
+  "dependencies": [],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "greeting": {
+        "type": "string",
+        "default": "Hello Industrial IoT",
+        "description": "Prefix used when generating greeting messages"
+      }
+    }
+  },
+  "healthCheck": {
+    "intervalMs": 30000,
+    "timeoutMs": 5000
+  }
+}

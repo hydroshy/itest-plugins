@@ -1,0 +1,24 @@
+{
+  "name": "@platform/frontend-sdk",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Universal Industrial IoT - Frontend Plugin SDK & Core UI Contracts",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

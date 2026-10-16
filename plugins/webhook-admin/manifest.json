@@ -1,0 +1,22 @@
+{
+  "id": "webhook-admin",
+  "name": "Webhook & Outbound Integration",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "webhook-dispatch",
+    "event-filter",
+    "retry-delivery"
+  ],
+  "permissions": [
+    "webhooks:read",
+    "webhooks:write",
+    "webhooks:send"
+  ],
+  "ui": {
+    "component": "WebhookAdminView",
+    "slot": "webhook-admin"
+  },
+  "description": "Configurable webhook endpoints, event filtering, signing & retry delivery engine"
+}

@@ -1,0 +1,45 @@
+{
+  "id": "thingpark-connector",
+  "name": "Actility ThingPark Enterprise LoRaWAN Connector",
+  "version": "1.0.0",
+  "type": "connector",
+  "entry": "dist/index.js",
+  "author": "Universal IoT Platform Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/universal-iot/plugin-thingpark-connector.git"
+  },
+  "capabilities": [
+    "thingpark-uplink-ingestion",
+    "thingpark-dx-core-rest",
+    "thingpark-downlink-dispatch",
+    "payload-normalization",
+    "lorawan-telemetry"
+  ],
+  "permissions": [
+    "lorawan:network-server:read",
+    "lorawan:device:read",
+    "telemetry:ingest"
+  ],
+  "description": "Enterprise Actility ThingPark Wireless LoRaWAN connector with DX Core REST integration and normalized uplink telemetry.",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "dxCoreEndpoint": {
+        "type": "string",
+        "title": "ThingPark DX Core Endpoint URL",
+        "default": "https://dx-api.thingpark.com/core/v1"
+      },
+      "subscriberId": {
+        "type": "string",
+        "title": "Subscriber ID"
+      },
+      "apiToken": {
+        "type": "string",
+        "title": "API Token",
+        "format": "password"
+      }
+    }
+  }
+}

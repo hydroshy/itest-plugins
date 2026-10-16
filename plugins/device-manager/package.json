@@ -1,0 +1,14 @@
+{
+  "name": "@iot-plugin/device-manager",
+  "version": "1.0.0",
+  "description": "Unified Device Management, Fleet Oversight & Provisioning Application Plugin",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*",
+    "@iot-platform/device-registry": "workspace:*"
+  }
+}

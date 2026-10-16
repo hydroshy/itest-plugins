@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/device-profile-manager",
+  "version": "1.0.0",
+  "description": "Device Profile, Memory Map & Payload Decoder Management Application Plugin",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

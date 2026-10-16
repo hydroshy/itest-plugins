@@ -1,0 +1,21 @@
+{
+  "id": "test-builder",
+  "name": "Test Builder Studio",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "test-builder",
+    "step-flow-engine",
+    "assertion-matrix"
+  ],
+  "permissions": [
+    "test:builder:read",
+    "test:builder:write"
+  ],
+  "ui": {
+    "component": "TestBuilderView",
+    "slot": "test-builder"
+  },
+  "description": "Visual test sequence builder, dynamic assertions & protocol-agnostic verification flows"
+}

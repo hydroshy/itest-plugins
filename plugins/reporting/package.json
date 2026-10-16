@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/reporting",
+  "version": "1.0.0",
+  "description": "Telemetry Reporting, Data Export & Audit Trail Application Plugin",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

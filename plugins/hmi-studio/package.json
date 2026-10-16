@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/hmi-studio",
+  "version": "1.0.0",
+  "description": "Interactive industrial HMI screen designer, dynamic widget canvas & data-binding runtime",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@iot-platform/connection-manager",
+  "version": "1.0.0",
+  "description": "Multi-protocol connection pool and lifecycle manager",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*",
+    "@iot-platform/event-bus": "workspace:*"
+  }
+}

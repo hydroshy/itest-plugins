@@ -1,0 +1,46 @@
+{
+  "id": "chirpstack-connector",
+  "name": "ChirpStack LoRaWAN & Gateway Connector",
+  "version": "1.0.0",
+  "type": "connector",
+  "entry": "dist/index.js",
+  "description": "ChirpStack v3/v4 Protocol Adapter, Webhook Ingestion & Daviteq Gateway Bridge",
+  "author": "Universal IoT Platform Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/universal-iot/plugin-chirpstack-connector.git"
+  },
+  "capabilities": [
+    "PROTOCOL_ADAPTER",
+    "GATEWAY_ADAPTER",
+    "TELEMETRY_INGESTION",
+    "chirpstack-v3",
+    "chirpstack-v4"
+  ],
+  "permissions": [
+    "network:outbound",
+    "telemetry:publish"
+  ],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "gatewayEndpoint": {
+        "type": "string",
+        "title": "ChirpStack Gateway Bridge Endpoint",
+        "default": "https://iengineering.daviteq.com/chirpstack/gateway"
+      },
+      "serverVersion": {
+        "type": "string",
+        "title": "ChirpStack Server Version",
+        "enum": ["v3", "v4"],
+        "default": "v4"
+      },
+      "forwardGatewayStats": {
+        "type": "boolean",
+        "title": "Forward Gateway Statistics",
+        "default": true
+      }
+    }
+  }
+}

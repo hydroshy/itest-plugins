@@ -1,0 +1,22 @@
+{
+  "id": "test-automation",
+  "name": "Test Automation & Mock Suite",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "automated-tests",
+    "mock-telemetry-generation",
+    "mqtt-test-runner",
+    "test-history"
+  ],
+  "permissions": [
+    "telemetry:write",
+    "mqtt:publish"
+  ],
+  "ui": {
+    "component": "TestAutomationView",
+    "slot": "testing"
+  },
+  "description": "Configurable test scripts, simulated device publishers, load testing runner, and execution history."
+}

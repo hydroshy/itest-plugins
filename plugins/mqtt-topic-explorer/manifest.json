@@ -1,0 +1,22 @@
+{
+  "id": "mqtt-topic-explorer",
+  "name": "MQTT Topic Explorer",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "topic-tree-inspection",
+    "subscription-monitoring",
+    "payload-inspector",
+    "test-publish"
+  ],
+  "permissions": [
+    "mqtt:topics:read",
+    "mqtt:publish"
+  ],
+  "ui": {
+    "component": "MqttTopicExplorerView",
+    "slot": "diagnostics"
+  },
+  "description": "Real-time MQTT topic tree explorer, subscription inspector, and test message publisher."
+}

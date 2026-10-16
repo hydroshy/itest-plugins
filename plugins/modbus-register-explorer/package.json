@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/modbus-register-explorer",
+  "version": "1.0.0",
+  "description": "Modbus Register Explorer, Presets & Interactive Diagnostics Plugin",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

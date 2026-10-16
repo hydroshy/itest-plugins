@@ -1,0 +1,80 @@
+{
+  "id": "mqtt-connector",
+  "name": "MQTT Protocol Connector Plugin",
+  "version": "1.0.0",
+  "type": "connector",
+  "entry": "dist/index.js",
+  "author": "Universal IoT Platform Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/universal-iot/plugin-mqtt-connector.git"
+  },
+  "capabilities": [
+    "mqtt-v3.1.1",
+    "mqtt-v5",
+    "tcp",
+    "tls",
+    "qos-0-1-2",
+    "retained-messages",
+    "last-will",
+    "persistent-session",
+    "connection-pooling",
+    "topic-mapping",
+    "tenant-acl",
+    "ring-buffer-backpressure"
+  ],
+  "permissions": [
+    "mqtt:publish",
+    "mqtt:subscribe"
+  ],
+  "description": "Multi-broker MQTT connector supporting Mosquitto, EMQX, HiveMQ with QoS 0/1/2, TLS, offline ring buffer backpressure and connection pooling",
+  "configSchema": {
+    "type": "object",
+    "required": ["brokerUrl"],
+    "properties": {
+      "brokerUrl": {
+        "type": "string",
+        "title": "MQTT Broker URL",
+        "default": "mqtt://127.0.0.1:1883"
+      },
+      "clientId": {
+        "type": "string",
+        "title": "Client ID",
+        "default": "universal-iot-edge"
+      },
+      "username": {
+        "type": "string",
+        "title": "Username"
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "format": "password"
+      },
+      "keepalive": {
+        "type": "integer",
+        "title": "Keep Alive (seconds)",
+        "default": 60,
+        "minimum": 10
+      },
+      "cleanSession": {
+        "type": "boolean",
+        "title": "Clean Session",
+        "default": true
+      },
+      "backpressurePolicy": {
+        "type": "string",
+        "title": "Backpressure Policy",
+        "enum": ["drop-oldest", "drop-newest", "reject"],
+        "default": "drop-oldest"
+      },
+      "offlineBufferSize": {
+        "type": "integer",
+        "title": "Offline Ring Buffer Size",
+        "default": 1000,
+        "minimum": 10
+      }
+    }
+  }
+}

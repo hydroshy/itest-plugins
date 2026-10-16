@@ -1,0 +1,13 @@
+{
+  "name": "@iot-platform/event-bus",
+  "version": "1.0.0",
+  "description": "High-throughput asynchronous typed event bus for IoT plugins and backbone",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

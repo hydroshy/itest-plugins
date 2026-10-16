@@ -1,0 +1,21 @@
+{
+  "id": "final-config-manager",
+  "name": "Final Configuration Manager",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "config-import-export",
+    "schema-validation",
+    "environment-presets"
+  ],
+  "permissions": [
+    "config:read",
+    "config:write"
+  ],
+  "ui": {
+    "component": "FinalConfigManagerView",
+    "slot": "settings"
+  },
+  "description": "System final configuration parameters, JSON/YAML profile import/export, and schema validation."
+}

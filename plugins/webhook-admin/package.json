@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/webhook-admin",
+  "version": "1.0.0",
+  "description": "Configurable webhook endpoints, event filtering, signing & retry delivery engine",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

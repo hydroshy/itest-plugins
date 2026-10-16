@@ -1,0 +1,14 @@
+{
+  "name": "@iot-platform/device-registry",
+  "version": "1.0.0",
+  "description": "Unified Device Registry and Device Driver Manager for Universal IoT Platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*",
+    "@iot-platform/event-bus": "workspace:*"
+  }
+}

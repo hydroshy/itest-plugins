@@ -1,0 +1,14 @@
+{
+  "name": "@iot-platform/telemetry-engine",
+  "version": "1.0.0",
+  "description": "Unified Telemetry Engine: Ingest, Validate, Decode, Normalize, Route, and Publish",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*",
+    "@iot-platform/event-bus": "workspace:*"
+  }
+}

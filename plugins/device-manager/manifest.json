@@ -1,0 +1,23 @@
+{
+  "id": "device-manager",
+  "name": "Device Manager",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "device-inventory",
+    "fleet-oversight",
+    "device-provisioning",
+    "connection-status-tracking"
+  ],
+  "permissions": [
+    "devices:read",
+    "devices:write",
+    "devices:delete"
+  ],
+  "ui": {
+    "component": "DeviceManagerView",
+    "slot": "main-navigation"
+  },
+  "description": "Multi-protocol device fleet management with card grid, status metrics, and user-scoped provisioning."
+}

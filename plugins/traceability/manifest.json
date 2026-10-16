@@ -1,0 +1,32 @@
+{
+  "id": "traceability",
+  "name": "QA & Test Traceability Plugin",
+  "version": "1.0.0",
+  "type": "APPLICATION",
+  "description": "Comprehensive QA test automation, device testing run records, assertion rules, packet log audits and production traceability.",
+  "author": "Antigravity DSH Team",
+  "license": "UNLICENSED",
+  "entry": "dist/index.js",
+  "database": {
+    "schemaName": "plugin_traceability",
+    "tables": [
+      "device_tested",
+      "test_templates",
+      "test_assertions",
+      "test_sessions",
+      "test_device_runs",
+      "test_evidence",
+      "test_packet_logs",
+      "test_result",
+      "final_config_presets",
+      "final_config_regs",
+      "final_config_sn",
+      "final_config_regs_sn"
+    ]
+  },
+  "capabilities": {
+    "testRunner": true,
+    "assertionValidation": true,
+    "traceabilityExport": true
+  }
+}

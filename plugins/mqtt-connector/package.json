@@ -1,0 +1,18 @@
+{
+  "name": "@universal-iot/plugin-mqtt-connector",
+  "version": "1.0.0",
+  "description": "MQTT v3.1.1/v5 Connector Plugin with Topic Mapping and Telemetry Ingestion",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "pack": "node ../../scripts/pack-plugin.mjs .",
+    "test": "node --test test/mqtt-connector.test.mjs"
+  },
+  "dependencies": {
+    "@universal-iot/plugin-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

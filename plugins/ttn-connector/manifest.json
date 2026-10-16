@@ -1,0 +1,44 @@
+{
+  "id": "ttn-connector",
+  "name": "The Things Network (TTN v3) Connector",
+  "version": "1.0.0",
+  "type": "connector",
+  "entry": "dist/index.js",
+  "author": "Universal IoT Platform Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/universal-iot/plugin-ttn-connector.git"
+  },
+  "capabilities": [
+    "ttn-v3-webhook",
+    "ttn-uplink-normalization",
+    "ttn-downlink-dispatch",
+    "lorawan-telemetry"
+  ],
+  "permissions": [
+    "lorawan:network-server:read",
+    "lorawan:device:read",
+    "telemetry:ingest"
+  ],
+  "description": "Standardized connector for The Things Network (TTN v3) / The Things Stack webhook ingestion and telemetry forwarding.",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "applicationId": {
+        "type": "string",
+        "title": "TTN Application ID"
+      },
+      "webhookPath": {
+        "type": "string",
+        "title": "Webhook URL Path",
+        "default": "/api/v1/integrations/ttn/uplink"
+      },
+      "apiKey": {
+        "type": "string",
+        "title": "API Key / Auth Token",
+        "format": "password"
+      }
+    }
+  }
+}

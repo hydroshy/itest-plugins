@@ -1,0 +1,23 @@
+{
+  "id": "reporting",
+  "name": "Reporting & Audit Trail",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "telemetry-reporting",
+    "csv-export",
+    "pdf-export",
+    "audit-trail"
+  ],
+  "permissions": [
+    "telemetry:read",
+    "audit:read",
+    "reports:generate"
+  ],
+  "ui": {
+    "component": "ReportingView",
+    "slot": "reports"
+  },
+  "description": "Historical telemetry data aggregation, automated export, and compliance audit trail reporting."
+}

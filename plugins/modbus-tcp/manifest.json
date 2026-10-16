@@ -1,0 +1,70 @@
+{
+  "id": "modbus-tcp",
+  "name": "Modbus TCP Protocol Plugin",
+  "version": "1.0.0",
+  "type": "protocol",
+  "entry": "dist/index.js",
+  "author": "Universal IoT Platform Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/universal-iot/plugin-modbus-tcp.git"
+  },
+  "capabilities": [
+    "tcp-client",
+    "mbap-header",
+    "transaction-id-correlation",
+    "connection-pooling",
+    "polling-scheduler",
+    "batch-read",
+    "reconnect"
+  ],
+  "permissions": [
+    "modbus:read",
+    "modbus:write"
+  ],
+  "description": "Modbus TCP client with MBAP framing, connection pooling, stream defragmentation and transaction correlation",
+  "configSchema": {
+    "type": "object",
+    "required": ["host", "port"],
+    "properties": {
+      "host": {
+        "type": "string",
+        "title": "Modbus Gateway / PLC IP Address",
+        "default": "127.0.0.1"
+      },
+      "port": {
+        "type": "integer",
+        "title": "TCP Port",
+        "default": 502,
+        "minimum": 1,
+        "maximum": 65535
+      },
+      "unitId": {
+        "type": "integer",
+        "title": "Default Unit ID (Slave ID)",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 255
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "title": "Socket Timeout (ms)",
+        "default": 3000,
+        "minimum": 100
+      },
+      "maxConnections": {
+        "type": "integer",
+        "title": "Max Connections in Pool",
+        "default": 10,
+        "minimum": 1
+      },
+      "reconnectDelayMs": {
+        "type": "integer",
+        "title": "Auto-reconnect Interval (ms)",
+        "default": 5000,
+        "minimum": 500
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "order-management",
+  "name": "Order & Production Management",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "sales-orders",
+    "item-codes",
+    "sensor-types",
+    "manufacturing-batch"
+  ],
+  "permissions": [
+    "orders:read",
+    "orders:write",
+    "inventory:read"
+  ],
+  "ui": {
+    "component": "OrderManagementView",
+    "slot": "order-management"
+  },
+  "description": "Sales orders, item codes catalog, sensor types specification & hardware manufacturing batch tracking"
+}

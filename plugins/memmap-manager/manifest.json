@@ -1,0 +1,22 @@
+{
+  "id": "memmap-manager",
+  "name": "Memory Map Manager & Upload",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "memmap-parser",
+    "memmap-registry",
+    "register-validator"
+  ],
+  "permissions": [
+    "memmap:read",
+    "memmap:write",
+    "memmap:upload"
+  ],
+  "ui": {
+    "component": "MemmapManagerView",
+    "slot": "memmap-manager"
+  },
+  "description": "Register layout specifications, memory map definition upload, parser and runtime lookup registry"
+}

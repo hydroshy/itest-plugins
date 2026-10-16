@@ -1,0 +1,24 @@
+{
+  "id": "alarm-engine",
+  "name": "Alarm Engine",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "alarm-rules",
+    "threshold-monitoring",
+    "alert-dispatch",
+    "acknowledgment-workflow"
+  ],
+  "permissions": [
+    "telemetry:read",
+    "alarms:read",
+    "alarms:write",
+    "alarms:ack"
+  ],
+  "ui": {
+    "component": "AlarmEngineView",
+    "slot": "alerts"
+  },
+  "description": "Configurable alarm rules, real-time threshold evaluations, and alert notification dispatching."
+}

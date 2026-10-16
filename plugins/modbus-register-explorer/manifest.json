@@ -1,0 +1,22 @@
+{
+  "id": "modbus-register-explorer",
+  "name": "Modbus Register Explorer",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "register-explorer",
+    "modbus-presets",
+    "batch-register-read",
+    "safe-register-write"
+  ],
+  "permissions": [
+    "modbus:registers:read",
+    "modbus:registers:write"
+  ],
+  "ui": {
+    "component": "ModbusRegisterExplorerView",
+    "slot": "diagnostics"
+  },
+  "description": "Interactive Modbus register map explorer, template presets, and live diagnostic polling tool."
+}

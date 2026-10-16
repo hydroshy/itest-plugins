@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/memmap-manager",
+  "version": "1.0.0",
+  "description": "Register layout specifications, memory map definition upload, parser and runtime lookup registry",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

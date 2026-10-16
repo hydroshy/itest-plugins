@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/test-builder",
+  "version": "1.0.0",
+  "description": "Visual test sequence builder, dynamic assertions & protocol-agnostic verification flows",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

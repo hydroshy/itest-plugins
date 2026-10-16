@@ -1,0 +1,23 @@
+{
+  "id": "telemetry-dashboard",
+  "name": "Telemetry Dashboard & HMI",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "realtime-widgets",
+    "hmi-canvas",
+    "telemetry-charts",
+    "overview-hub"
+  ],
+  "permissions": [
+    "telemetry:read",
+    "dashboard:view",
+    "dashboard:edit"
+  ],
+  "ui": {
+    "component": "TelemetryDashboardView",
+    "slot": "dashboard"
+  },
+  "description": "Configurable HMI visual canvas and live telemetry dashboard with charts, gauges, and status summaries."
+}

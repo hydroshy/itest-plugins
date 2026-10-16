@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/alarm-engine",
+  "version": "1.0.0",
+  "description": "Industrial Alarm Rules, Condition Evaluator & Alerting Application Plugin",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

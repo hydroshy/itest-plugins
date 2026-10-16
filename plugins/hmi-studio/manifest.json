@@ -1,0 +1,21 @@
+{
+  "id": "hmi-studio",
+  "name": "HMI Screen Studio",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "hmi-designer",
+    "canvas-runtime",
+    "widget-binding"
+  ],
+  "permissions": [
+    "hmi:read",
+    "hmi:write"
+  ],
+  "ui": {
+    "component": "HmiStudioView",
+    "slot": "hmi-studio"
+  },
+  "description": "Interactive industrial HMI screen designer, dynamic widget canvas & data-binding runtime"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@universal-iot/plugin-traceability",
+  "version": "1.0.0",
+  "description": "QA & Test Traceability Plugin with Customer Final Config Preset management",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@universal-iot/plugin-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

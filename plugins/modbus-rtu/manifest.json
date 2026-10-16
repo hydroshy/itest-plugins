@@ -1,0 +1,80 @@
+{
+  "id": "modbus-rtu",
+  "name": "Modbus RTU / RS485 Protocol Plugin",
+  "version": "1.0.0",
+  "type": "protocol",
+  "entry": "dist/index.js",
+  "author": "Universal IoT Platform Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/universal-iot/plugin-modbus-rtu.git"
+  },
+  "capabilities": [
+    "serial-rs485",
+    "half-duplex-lock",
+    "crc16-modbus",
+    "polling-scheduler",
+    "coils",
+    "discrete-inputs",
+    "holding-registers",
+    "input-registers",
+    "write-single-coil",
+    "write-single-reg",
+    "write-multiple-coils",
+    "write-multiple-regs"
+  ],
+  "permissions": [
+    "modbus:read",
+    "modbus:write"
+  ],
+  "description": "Modbus RTU over RS485/Serial with half-duplex bus coordination, multi-datatype codec and polling scheduler",
+  "configSchema": {
+    "type": "object",
+    "required": ["port", "baudRate"],
+    "properties": {
+      "port": {
+        "type": "string",
+        "title": "Serial Port",
+        "description": "Serial port device name (e.g. COM1, COM3 or /dev/ttyUSB0)",
+        "default": "COM1"
+      },
+      "baudRate": {
+        "type": "integer",
+        "title": "Baud Rate",
+        "enum": [2400, 4800, 9600, 19200, 38400, 57600, 115200],
+        "default": 9600
+      },
+      "dataBits": {
+        "type": "integer",
+        "title": "Data Bits",
+        "enum": [7, 8],
+        "default": 8
+      },
+      "stopBits": {
+        "type": "integer",
+        "title": "Stop Bits",
+        "enum": [1, 2],
+        "default": 1
+      },
+      "parity": {
+        "type": "string",
+        "title": "Parity",
+        "enum": ["none", "even", "odd"],
+        "default": "none"
+      },
+      "interFrameDelayMs": {
+        "type": "number",
+        "title": "t3.5 Inter-frame Delay (ms)",
+        "default": 3.5,
+        "minimum": 1
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "title": "Response Timeout (ms)",
+        "default": 1000,
+        "minimum": 100
+      }
+    }
+  }
+}

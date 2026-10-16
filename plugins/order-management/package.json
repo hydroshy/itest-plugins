@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/order-management",
+  "version": "1.0.0",
+  "description": "Sales orders, item codes catalog, sensor types specification & hardware manufacturing batch tracking",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/final-config-manager",
+  "version": "1.0.0",
+  "description": "System Final Configuration, Schema Validation & Deployment Parameter Plugin",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

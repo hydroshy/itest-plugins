@@ -1,0 +1,46 @@
+{
+  "id": "payload",
+  "name": "Sandboxed Payload & Memory Map Decoder Plugin",
+  "version": "1.0.0",
+  "type": "processor",
+  "entry": "dist/index.js",
+  "author": "Universal IoT Platform Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/universal-iot/plugin-payload-decoder.git"
+  },
+  "capabilities": [
+    "sandboxed-vm",
+    "lorawan-uplink-decode",
+    "chirpstack-v4-decodeUplink",
+    "ttn-Decoder",
+    "modbus-register-mapping",
+    "memory-map-parser",
+    "multi-endian"
+  ],
+  "permissions": [
+    "telemetry:transform",
+    "vm:isolated-execute"
+  ],
+  "description": "Isolated VM JavaScript payload decoder supporting TTN v3/v4 decodeUplink, chirpstack decoders and Modbus register memory mapping",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "timeoutMs": {
+        "type": "integer",
+        "title": "Execution Timeout (ms)",
+        "default": 500,
+        "minimum": 50,
+        "maximum": 5000
+      },
+      "memoryLimitMb": {
+        "type": "integer",
+        "title": "Memory Limit (MB)",
+        "default": 64,
+        "minimum": 16,
+        "maximum": 256
+      }
+    }
+  }
+}

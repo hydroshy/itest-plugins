@@ -1,0 +1,22 @@
+{
+  "id": "device-profile-manager",
+  "name": "Device Profile Manager",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "memmap-management",
+    "sensor-type-catalog",
+    "payload-decoder-sandbox",
+    "register-mapping"
+  ],
+  "permissions": [
+    "profiles:read",
+    "profiles:write"
+  ],
+  "ui": {
+    "component": "DeviceProfileManagerView",
+    "slot": "configuration"
+  },
+  "description": "Comprehensive profile manager for Modbus & LoRaWAN register maps, sensor types, and JavaScript decoders."
+}

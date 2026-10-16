@@ -1,0 +1,13 @@
+{
+  "name": "@iot-plugin/mqtt-topic-explorer",
+  "version": "1.0.0",
+  "description": "MQTT Topic Tree, Subscription Explorer & Live Message Inspector Plugin",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}

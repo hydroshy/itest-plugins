@@ -1,0 +1,49 @@
+{
+  "id": "globiots-connector",
+  "name": "Globiots LoRa Service Connector & Forwarder",
+  "version": "1.0.0",
+  "type": "connector",
+  "entry": "dist/index.js",
+  "description": "Integration with Globiots Cloud LoRa Service (Uplink Ingestion & Forwarding)",
+  "author": "Universal IoT Platform Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/universal-iot/plugin-globiots-connector.git"
+  },
+  "capabilities": [
+    "PROTOCOL_ADAPTER",
+    "DATA_FORWARDER",
+    "TELEMETRY_INGESTION",
+    "globiots-cloud-forwarding"
+  ],
+  "permissions": [
+    "network:outbound",
+    "telemetry:publish"
+  ],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "uplinkEndpoint": {
+        "type": "string",
+        "title": "Globiots Uplink Endpoint URL",
+        "default": "https://resources.globiots.com/rest/api/v1/lora-service/uplink-message"
+      },
+      "apiKey": {
+        "type": "string",
+        "title": "API Key",
+        "format": "password"
+      },
+      "bearerToken": {
+        "type": "string",
+        "title": "Bearer Auth Token",
+        "format": "password"
+      },
+      "autoForwardUplinks": {
+        "type": "boolean",
+        "title": "Auto Forward Uplinks",
+        "default": false
+      }
+    }
+  }
+}
