@@ -4,10 +4,23 @@ import {
   CreateGatewayDto,
   CreateDeviceDto,
   DecodePayloadDto,
+  CreateTenantDto,
 } from './chirpstack.types';
 
 export class LoRaWanChirpStackController {
   constructor(private readonly service: LoRaWanChirpStackService) {}
+
+  async getTenants(serverId?: string) {
+    return this.service.listTenants(serverId);
+  }
+
+  async addTenant(dto: CreateTenantDto) {
+    return this.service.createTenant(dto);
+  }
+
+  async deleteTenant(serverId: string, tenantId: string) {
+    return this.service.deleteTenant(serverId, tenantId);
+  }
 
   async getServers() {
     return this.service.getNetworkServers();

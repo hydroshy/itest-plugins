@@ -3,7 +3,8 @@ export interface ChirpStackNetworkServer {
   name: string;
   apiUrl: string;
   apiToken: string;
-  tenantId: string;
+  /** Optional when registering the ChirpStack server; tenants are managed separately. */
+  tenantId?: string;
   version: string;
   status: 'online' | 'offline' | 'untested';
   lastCheckedAt?: string;
@@ -89,11 +90,30 @@ export interface LoRaWanUplinkEvent {
   confirmed?: boolean;
 }
 
+export interface ChirpStackTenant {
+  id: string;
+  name: string;
+  description?: string;
+  canHaveGateways?: boolean;
+  maxGatewayCount?: number;
+  maxDeviceCount?: number;
+}
+
+export interface CreateTenantDto {
+  serverId: string;
+  name: string;
+  description?: string;
+  canHaveGateways?: boolean;
+  maxGatewayCount?: number;
+  maxDeviceCount?: number;
+}
+
 export interface CreateNetworkServerDto {
   name: string;
   apiUrl: string;
   apiToken: string;
-  tenantId: string;
+  /** Tenant selection belongs to TenantService and is optional for server registration. */
+  tenantId?: string;
 }
 
 export interface CreateGatewayDto {

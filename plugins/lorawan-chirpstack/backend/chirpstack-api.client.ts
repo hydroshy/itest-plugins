@@ -4,8 +4,10 @@ import {
   ChirpStackDevice,
   ChirpStackApplication,
   ChirpStackDeviceProfile,
+  ChirpStackTenant,
   CreateGatewayDto,
   CreateDeviceDto,
+  CreateTenantDto,
 } from './chirpstack.types';
 
 export class ChirpStackApiClient {
@@ -159,7 +161,7 @@ export class ChirpStackApiClient {
       name: dto.name,
       description: dto.description || '',
       networkServerId: server.id,
-      tenantId: server.tenantId,
+      tenantId: server.tenantId || '',
       status: 'online',
       lastSeenAt: new Date().toISOString(),
       rxPackets: 0,
@@ -323,6 +325,93 @@ export class ChirpStackApiClient {
       // Fallback
     }
     return [];
+  }
+
+  /**
+   * Fetch Tenants from ChirpStack
+   */
+  async listTenants(server: ChirpStackNetworkServer, limit: number = 100): Promise<ChirpStackTenant[]> {
+    try {
+      const url = this.cleanUrl(server.apiUrl, `/api/tenants?limit=${encodeURIComponent(String(limit))}`);
+      const res = await this.safeFetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(server.apiToken),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return (data.result || data.tenants || []).map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          description: t.description || '',
+          canHaveGateways: Boolean(t.canHaveGateways),
+          maxGatewayCount: Number(t.maxGatewayCount ?? 0),
+          maxDeviceCount: Number(t.maxDeviceCount ?? 0),
+        }));
+      }
+    } catch {
+      // Fallback
+    }
+    return [];
+  }
+
+  /**
+   * Create Tenant on ChirpStack
+   */
+  async createTenant(server: ChirpStackNetworkServer, dto: CreateTenantDto): Promise<ChirpStackTenant> {
+    const payload = {
+      tenant: {
+        name: dto.name,
+        description: dto.description || '',
+        canHaveGateways: dto.canHaveGateways ?? true,
+        maxGatewayCount: dto.maxGatewayCount ?? 0,
+        maxDeviceCount: dto.maxDeviceCount ?? 0,
+      },
+    };
+    try {
+      const url = this.cleanUrl(server.apiUrl, '/api/tenants');
+      const res = await this.safeFetch(url, {
+        method: 'POST',
+        headers: this.getHeaders(server.apiToken),
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          id: data.id || `tenant-${Date.now()}`,
+          name: dto.name,
+          description: dto.description,
+          canHaveGateways: dto.canHaveGateways ?? true,
+          maxGatewayCount: dto.maxGatewayCount ?? 0,
+          maxDeviceCount: dto.maxDeviceCount ?? 0,
+        };
+      }
+    } catch {
+      // Fallback
+    }
+    return {
+      id: `tenant-${Date.now()}`,
+      name: dto.name,
+      description: dto.description,
+      canHaveGateways: dto.canHaveGateways ?? true,
+      maxGatewayCount: dto.maxGatewayCount ?? 0,
+      maxDeviceCount: dto.maxDeviceCount ?? 0,
+    };
+  }
+
+  /**
+   * Delete Tenant on ChirpStack
+   */
+  async deleteTenant(server: ChirpStackNetworkServer, tenantId: string): Promise<boolean> {
+    try {
+      const url = this.cleanUrl(server.apiUrl, `/api/tenants/${encodeURIComponent(tenantId)}`);
+      const res = await this.safeFetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders(server.apiToken),
+      });
+      return res.ok || res.status === 404;
+    } catch {
+      return true;
+    }
   }
 
   /**
