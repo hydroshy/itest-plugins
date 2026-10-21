@@ -147,13 +147,19 @@ export class LoRaWanChirpStackService {
   }
 
   async addNetworkServer(dto: CreateNetworkServerDto): Promise<ChirpStackNetworkServer> {
+    const requireString = (field: string, value: unknown): string => {
+      if (typeof value !== 'string' || !value.trim()) {
+        throw new Error(`${field} is required and must be a non-empty string`);
+      }
+      return value.trim();
+    };
     const id = `cs-srv-${Date.now().toString(36)}`;
     const server: ChirpStackNetworkServer = {
       id,
-      name: dto.name,
-      apiUrl: dto.apiUrl.trim(),
-      apiToken: dto.apiToken.trim(),
-      tenantId: dto.tenantId?.trim() || '',
+      name: requireString('name', dto?.name),
+      apiUrl: requireString('apiUrl', dto?.apiUrl),
+      apiToken: requireString('apiToken', dto?.apiToken),
+      tenantId: typeof dto?.tenantId === 'string' ? dto.tenantId.trim() : '',
       version: 'ChirpStack v4',
       status: 'untested',
       lastCheckedAt: new Date().toISOString(),
