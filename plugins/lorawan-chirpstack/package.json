@@ -1,0 +1,14 @@
+{
+  "name": "@universal-iot/plugin-lorawan-chirpstack",
+  "version": "1.0.0",
+  "description": "ChirpStack v4 LoRaWAN Network Server, Gateway, Device and telemetry management plugin",
+  "main": "backend/dist/index.js",
+  "types": "backend/dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test --experimental-strip-types test/**/*.test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

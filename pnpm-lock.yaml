@@ -147,6 +147,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
 
+  plugins/lorawan-chirpstack:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   plugins/memmap-manager:
     dependencies:
       '@iot-platform/plugin-sdk':

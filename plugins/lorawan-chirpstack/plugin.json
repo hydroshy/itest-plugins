@@ -1,0 +1,39 @@
+{
+  "id": "lorawan-chirpstack",
+  "name": "LoRaWAN ChirpStack Network Manager",
+  "version": "1.0.0",
+  "sdkVersion": "^1.0.0",
+  "type": "HYBRID",
+  "description": "Quản lý Network Servers ChirpStack v4/v3, kết nối API để thêm/quản lý Gateway và Device, thu thập và giải mã Telemetry thời gian thực.",
+  "author": "ITEST IoT Platform Team",
+  "entry": "backend/dist/index.js",
+  "frontend": "frontend/index.ts",
+  "enabledByDefault": true,
+  "permissions": [
+    {
+      "namespace": "lorawan",
+      "resource": "server",
+      "action": "manage"
+    },
+    {
+      "namespace": "lorawan",
+      "resource": "gateway",
+      "action": "manage"
+    },
+    {
+      "namespace": "lorawan",
+      "resource": "device",
+      "action": "manage"
+    },
+    {
+      "namespace": "lorawan",
+      "resource": "telemetry",
+      "action": "read"
+    }
+  ],
+  "defaultConfig": {
+    "defaultServerUrl": "http://localhost:8080",
+    "apiTimeout": 10000,
+    "mqttUplinkTopic": "application/+/device/+/event/up"
+  }
+}
