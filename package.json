@@ -8,7 +8,7 @@
     "plugins/*"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "pnpm -r run build",
     "test": "node --test --experimental-strip-types test/plugin-lifecycle.test.ts"
   },
   "devDependencies": {
