@@ -1,0 +1,55 @@
+{
+  "id": "testing",
+  "name": "Testing & Verification Manager",
+  "version": "1.0.0",
+  "sdkVersion": "^1.0.0",
+  "type": "HYBRID",
+  "description": "Quản lý đăng ký thiết bị kiểm thử liên kết SO, WA, Item Code sang module Traceability, ghi nhận gói tin và tự động hóa flow đo kiểm.",
+  "author": "ITEST IoT Platform Team",
+  "entry": "dist/index.js",
+  "enabledByDefault": true,
+  "permissions": [
+    {
+      "namespace": "testing",
+      "resource": "device",
+      "action": "manage"
+    },
+    {
+      "namespace": "testing",
+      "resource": "device",
+      "action": "read"
+    },
+    {
+      "namespace": "testing",
+      "resource": "packet",
+      "action": "read"
+    },
+    {
+      "namespace": "testing",
+      "resource": "packet",
+      "action": "write"
+    },
+    {
+      "namespace": "traceability",
+      "resource": "so",
+      "action": "read"
+    },
+    {
+      "namespace": "traceability",
+      "resource": "wa",
+      "action": "read"
+    }
+  ],
+  "ui": {
+    "title": "Device Testing",
+    "icon": "Cpu",
+    "route": "/testing",
+    "component": "TestingManagerView",
+    "slot": "main-navigation"
+  },
+  "defaultConfig": {
+    "autoTraceOnRegister": true,
+    "maxPacketsRetentionDays": 30,
+    "enableLivePacketsStream": true
+  }
+}

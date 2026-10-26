@@ -241,6 +241,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
 
+  plugins/testing:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   plugins/thingpark-connector:
     dependencies:
       '@universal-iot/plugin-sdk':

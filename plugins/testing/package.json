@@ -1,0 +1,14 @@
+{
+  "name": "@universal-iot/plugin-testing",
+  "version": "1.0.0",
+  "description": "Device Testing & Verification plugin with Traceability integration (SO, WA, Item Code) and dynamic packet logging",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test --experimental-strip-types test/testing-plugin.spec.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
