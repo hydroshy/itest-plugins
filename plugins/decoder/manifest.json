@@ -1,0 +1,24 @@
+{
+  "id": "decoder",
+  "name": "LoRaWAN Payload Decoder",
+  "version": "1.0.0",
+  "type": "processor",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "lorawan-decoder",
+    "js-sandbox-runner",
+    "sku-long-fw-mapping",
+    "memmap-integration",
+    "dual-payload-formatting"
+  ],
+  "permissions": [
+    "decoder:read",
+    "decoder:write",
+    "decoder:execute"
+  ],
+  "ui": {
+    "component": "DecoderView",
+    "slot": "main-navigation"
+  },
+  "description": "LoRaWAN & IoT Payload Decoder Plugin with SKU and LONG_FW recognition, secure JS sandbox runner, and Memmap integration."
+}

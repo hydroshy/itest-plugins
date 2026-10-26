@@ -1,0 +1,14 @@
+{
+  "name": "@universal-iot/plugin-decoder",
+  "version": "1.0.0",
+  "description": "LoRaWAN & IoT Payload Decoder Plugin with SKU and LONG_FW recognition, secure JS sandbox runner, and Memmap integration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/decoder-plugin.spec.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

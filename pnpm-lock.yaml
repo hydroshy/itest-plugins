@@ -104,6 +104,12 @@ importers:
         specifier: ^5.3.3
         version: 5.9.3
 
+  plugins/decoder:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   plugins/device-manager:
     dependencies:
       '@iot-platform/device-registry':
