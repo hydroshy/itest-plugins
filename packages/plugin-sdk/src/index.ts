@@ -500,4 +500,5 @@ export interface DynamicPluginLoader {
 }
 
 export * from './dynamic-loader';
+export * from './metadata';
 
