@@ -1,0 +1,14 @@
+{
+  "name": "@universal-iot/plugin-device",
+  "version": "1.0.0",
+  "description": "Standalone Device Management Plugin for iTEST IoT Platform - device lifecycle, serial/DevEUI identity, traceability linkage (SO/WA/Item Code)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/device-plugin.spec.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

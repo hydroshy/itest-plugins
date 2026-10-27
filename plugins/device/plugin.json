@@ -1,0 +1,50 @@
+{
+  "id": "device",
+  "name": "Device Management",
+  "version": "1.0.0",
+  "sdkVersion": "^1.0.0",
+  "type": "HYBRID",
+  "description": "Quản lý vòng đời thiết bị IoT độc lập: đăng ký serial number, DevEUI, network ID, liên kết đơn hàng SO/WA và mã sản phẩm Item Code từ phân hệ Traceability.",
+  "author": "ITEST IoT Platform Team",
+  "entry": "dist/index.js",
+  "enabledByDefault": true,
+  "permissions": [
+    {
+      "namespace": "device",
+      "resource": "device",
+      "action": "manage"
+    },
+    {
+      "namespace": "device",
+      "resource": "device",
+      "action": "read"
+    },
+    {
+      "namespace": "device",
+      "resource": "device",
+      "action": "write"
+    },
+    {
+      "namespace": "traceability",
+      "resource": "so",
+      "action": "read"
+    },
+    {
+      "namespace": "traceability",
+      "resource": "wa",
+      "action": "read"
+    }
+  ],
+  "ui": {
+    "title": "Quản Lý Thiết Bị",
+    "icon": "Cpu",
+    "route": "/device",
+    "component": "DeviceManagerView",
+    "slot": "main-navigation"
+  },
+  "defaultConfig": {
+    "autoTraceOnRegister": true,
+    "defaultDeviceType": "LORA_SENSOR",
+    "defaultPluginId": "decoder"
+  }
+}

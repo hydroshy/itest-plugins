@@ -1,23 +1,18 @@
 {
   "id": "testing",
-  "name": "Testing & Verification Manager",
-  "version": "1.0.0",
+  "name": "Gateway Testing",
+  "version": "1.1.0",
   "sdkVersion": "^1.0.0",
   "type": "HYBRID",
-  "description": "Quản lý đăng ký thiết bị kiểm thử liên kết SO, WA, Item Code sang module Traceability, ghi nhận gói tin và tự động hóa flow đo kiểm.",
+  "description": "Chuyên đo kiểm Gateway và tự động hóa flow test kết nối ChirpStack server, giám sát luồng gói tin RF/Dual Payload.",
   "author": "ITEST IoT Platform Team",
   "entry": "dist/index.js",
   "enabledByDefault": true,
   "permissions": [
     {
       "namespace": "testing",
-      "resource": "device",
+      "resource": "gateway-session",
       "action": "manage"
-    },
-    {
-      "namespace": "testing",
-      "resource": "device",
-      "action": "read"
     },
     {
       "namespace": "testing",
@@ -28,27 +23,17 @@
       "namespace": "testing",
       "resource": "packet",
       "action": "write"
-    },
-    {
-      "namespace": "traceability",
-      "resource": "so",
-      "action": "read"
-    },
-    {
-      "namespace": "traceability",
-      "resource": "wa",
-      "action": "read"
     }
   ],
   "ui": {
-    "title": "Device Testing",
-    "icon": "Cpu",
+    "title": "Gateway Testing",
+    "icon": "Odometer",
     "route": "/testing",
-    "component": "TestingManagerView",
+    "component": "GatewayTestingView",
     "slot": "main-navigation"
   },
   "defaultConfig": {
-    "autoTraceOnRegister": true,
+    "chirpstackServerUrl": "http://chirpstack:8080",
     "maxPacketsRetentionDays": 30,
     "enableLivePacketsStream": true
   }
