@@ -1,5 +1,9 @@
 import { TestingService } from './testing.service';
-import { DeviceFilterQuery, DeviceRegistrationDTO } from './testing.types';
+import {
+  DeviceFilterQuery,
+  DeviceRegistrationDTO,
+  GatewayRegistrationSessionDTO,
+} from './testing.types';
 
 export class TestingController {
   constructor(private readonly service: TestingService) {}
@@ -26,7 +30,63 @@ export class TestingController {
     };
   }
 
-  // 2. Thiết bị kiểm thử (Devices)
+  // 2. Gateway Testing Sessions & Helpers
+  validateGatewayIp(ip: string) {
+    const isValid = TestingService.validateGatewayIp(ip);
+    return {
+      success: true,
+      data: {
+        ip,
+        isValid,
+      },
+    };
+  }
+
+  validateSerialConfirmation(actualSerial: string, confirmedSerial: string) {
+    const isMatched = TestingService.validateSerialConfirmation(actualSerial, confirmedSerial);
+    return {
+      success: true,
+      data: {
+        isMatched,
+      },
+    };
+  }
+
+  buildChangeGatewayConfig(dto: GatewayRegistrationSessionDTO, host?: string) {
+    const config = TestingService.buildChangeGatewayConfig(dto, host);
+    return {
+      success: true,
+      data: config,
+    };
+  }
+
+  async createGatewayTestSession(dto: GatewayRegistrationSessionDTO) {
+    const session = await this.service.createGatewayTestSession(dto);
+    return {
+      success: true,
+      message: 'Khởi tạo phiên kiểm thử Gateway thành công',
+      data: session,
+    };
+  }
+
+  async listGatewayTestSessions() {
+    const sessions = await this.service.getGatewayTestSessions();
+    return {
+      success: true,
+      data: sessions,
+      total: sessions.length,
+    };
+  }
+
+  async getGatewayTestSession(id: string) {
+    const session = await this.service.getGatewayTestSessionById(id);
+    if (!session) {
+      return { success: false, message: 'Phiên kiểm thử Gateway không tồn tại', statusCode: 404 };
+    }
+    return { success: true, data: session };
+  }
+
+  // 3. Thiết bị kiểm thử (Devices)
   async registerDevice(dto: DeviceRegistrationDTO) {
     const device = await this.service.registerDevice(dto);
     return {
@@ -53,7 +113,7 @@ export class TestingController {
     return { success: true, data: device };
   }
 
-  // 3. Gói tin (Packets)
+  // 4. Gói tin (Packets)
   async recordPacket(packetInput: {
     network_id: string;
     raw_payload: string;
@@ -78,3 +138,4 @@ export class TestingController {
     };
   }
 }
+

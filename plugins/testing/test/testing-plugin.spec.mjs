@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { TestingPlugin, PacketProcessor } from '../dist/index.js';
+import { TestingPlugin, PacketProcessor, TestingService } from '../dist/index.js';
 
 describe('Testing Plugin Tests', () => {
   const plugin = new TestingPlugin();
@@ -140,4 +140,159 @@ describe('Testing Plugin Tests', () => {
       assert.strictEqual(packetList.items[0].raw_payload, buf.toString('hex').toUpperCase());
     });
   });
+
+  describe('4. Gateway Testing Registration & Flow', () => {
+    it('should validate Gateway IPv4 format correctly', () => {
+      assert.strictEqual(TestingService.validateGatewayIp('192.168.1.5'), true);
+      assert.strictEqual(TestingService.validateGatewayIp('10.0.0.1'), true);
+      assert.strictEqual(TestingService.validateGatewayIp('172.16.254.1'), true);
+      assert.strictEqual(TestingService.validateGatewayIp('256.0.0.1'), false);
+      assert.strictEqual(TestingService.validateGatewayIp('192.168.1'), false);
+      assert.strictEqual(TestingService.validateGatewayIp('invalid-ip'), false);
+      assert.strictEqual(TestingService.validateGatewayIp(''), false);
+    });
+
+    it('should validate Serial confirmation matching', () => {
+      assert.strictEqual(TestingService.validateSerialConfirmation('GW-SN-9988', 'GW-SN-9988'), true);
+      assert.strictEqual(TestingService.validateSerialConfirmation('GW-SN-9988', ' GW-SN-9988 '), true);
+      assert.strictEqual(TestingService.validateSerialConfirmation('GW-SN-9988', 'GW-SN-0000'), false);
+      assert.strictEqual(TestingService.validateSerialConfirmation('', 'GW-SN-9988'), false);
+    });
+
+    it('should build changeGatewayConfig for Ethernet test and 4G test', () => {
+      // Ethernet test
+      const ethConfig = TestingService.buildChangeGatewayConfig(
+        {
+          so: 'SO-2026-10-001',
+          wa: 'WA-001-A',
+          gateway_ip: '192.168.1.5',
+          network_server_id: 'ns-chirpstack-01',
+          internet_test_type: 'Ethernet test',
+          region_test: 'EU868',
+          confirmed_serial_number: 'SN-GW-1234',
+        },
+        '192.168.1.100'
+      );
+
+      assert.strictEqual(ethConfig.gatewayConfig.ethernet_metric, '100');
+      assert.strictEqual(ethConfig.gatewayConfig.lte_metric, '102');
+      assert.strictEqual(ethConfig.gatewayConfig.lorawan_frequency_plan, 'eu868');
+      assert.strictEqual(ethConfig.gatewayConfig.network_server_host, '192.168.1.100');
+      assert.strictEqual(ethConfig.gatewayConfig.ns_uplink_port, '1700');
+      assert.strictEqual(ethConfig.gatewayConfig.ns_downlink_port, '1700');
+
+      // 4G test
+      const lteConfig = TestingService.buildChangeGatewayConfig(
+        {
+          so: 'SO-2026-10-001',
+          wa: 'WA-001-A',
+          gateway_ip: '192.168.1.5',
+          network_server_id: 'ns-chirpstack-01',
+          internet_test_type: '4G Test',
+          region_test: 'AS923',
+          confirmed_serial_number: 'SN-GW-1234',
+        },
+        'chirpstack.internal'
+      );
+
+      assert.strictEqual(lteConfig.gatewayConfig.ethernet_metric, '102');
+      assert.strictEqual(lteConfig.gatewayConfig.lte_metric, '100');
+      assert.strictEqual(lteConfig.gatewayConfig.lorawan_frequency_plan, 'as923');
+      assert.strictEqual(lteConfig.gatewayConfig.network_server_host, 'chirpstack.internal');
+    });
+
+    it('should create a Gateway Test Session and persist traceability metadata', async () => {
+      const session = await service.createGatewayTestSession({
+        so: 'SO-2026-10-001',
+        wa: 'WA-001-A',
+        gateway_ip: '192.168.1.5',
+        network_server_id: 'ns-chirpstack-01',
+        internet_test_type: 'Ethernet test',
+        region_test: 'EU868',
+        confirmed_serial_number: 'SN-GW-888999',
+        gateway_info: {
+          serial_number: 'SN-GW-888999',
+          item_code: '5F0820',
+          sku: 'PINEX',
+          eui: '88a29eFFFEb99f7d',
+          hardware_version: '2H',
+          firmware_version: '9F0731',
+          mechanical_version: '2M',
+          lte_module_serial_number: 'LTE-SN-776655',
+          lte_module_imei: '862000055123456',
+        },
+      });
+
+      assert.ok(session.id);
+      assert.strictEqual(session.serial_number, 'SN-GW-888999');
+      assert.strictEqual(session.eui, '88a29eFFFEb99f7d');
+      assert.strictEqual(session.sku, 'PINEX');
+      assert.strictEqual(session.hardware_version, '2H');
+      assert.strictEqual(session.firmware_version, '9F0731');
+      assert.strictEqual(session.mechanical_version, '2M');
+      assert.strictEqual(session.lte_module_serial_number, 'LTE-SN-776655');
+      assert.strictEqual(session.lte_module_imei, '862000055123456');
+      assert.strictEqual(session.status, 'REGISTERED');
+
+      // Verify list sessions
+      const sessions = await service.getGatewayTestSessions();
+      assert.strictEqual(sessions.length >= 1, true);
+
+      // Verify controller lookup
+      const controller = plugin.getController();
+      const ctrlRes = await controller.getGatewayTestSession(session.id);
+      assert.strictEqual(ctrlRes.success, true);
+      assert.strictEqual(ctrlRes.data.serial_number, 'SN-GW-888999');
+    });
+
+    it('should reject session creation when serial confirmation does not match', async () => {
+      await assert.rejects(
+        async () => {
+          await service.createGatewayTestSession({
+            so: 'SO-2026-10-001',
+            wa: 'WA-001-A',
+            gateway_ip: '192.168.1.5',
+            network_server_id: 'ns-chirpstack-01',
+            internet_test_type: 'Ethernet test',
+            region_test: 'EU868',
+            confirmed_serial_number: 'WRONG-SERIAL',
+            gateway_info: {
+              serial_number: 'ACTUAL-SERIAL',
+              item_code: '5F0820',
+              sku: 'PINEX',
+              eui: '88a29eFFFEb99f7d',
+            },
+          });
+        },
+        {
+          name: 'Error',
+          message: 'Confirmed serial "WRONG-SERIAL" does not match actual serial "ACTUAL-SERIAL"',
+        }
+      );
+    });
+
+    it('should reject session creation when IP is invalid', async () => {
+      await assert.rejects(
+        async () => {
+          await service.createGatewayTestSession({
+            so: 'SO-2026-10-001',
+            wa: 'WA-001-A',
+            gateway_ip: '999.999.999.999',
+            network_server_id: 'ns-chirpstack-01',
+            internet_test_type: 'Ethernet test',
+            region_test: 'EU868',
+            confirmed_serial_number: 'SN-GW-1234',
+            gateway_info: {
+              serial_number: 'SN-GW-1234',
+              item_code: '5F0820',
+              sku: 'PINEX',
+              eui: '88a29eFFFEb99f7d',
+            },
+          });
+        },
+        /Invalid Gateway IP format/
+      );
+    });
+  });
 });
+

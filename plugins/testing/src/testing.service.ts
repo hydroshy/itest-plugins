@@ -1,7 +1,10 @@
 import {
+  ChangeGatewayConfigRequest,
   DeviceFilterQuery,
   DevicePacketDTO,
   DeviceRegistrationDTO,
+  GatewayRegistrationSessionDTO,
+  GatewayTestSession,
   TestingDevice,
   TestingDeviceStatus,
   TraceabilityLookupItemCode,
@@ -14,10 +17,50 @@ import { PacketProcessor } from './packet-processor';
 export class TestingService {
   private devices: Map<string, TestingDevice> = new Map();
   private packets: DevicePacketDTO[] = [];
+  private gatewaySessions: Map<string, GatewayTestSession> = new Map();
   private traceabilityProvider: ITraceabilityProvider;
 
   constructor(traceabilityProvider?: ITraceabilityProvider) {
     this.traceabilityProvider = traceabilityProvider || new DefaultTraceabilityBridge();
+  }
+
+  // --- GATEWAY CONFIG & VALIDATION HELPERS ---
+
+  static validateGatewayIp(ip: string): boolean {
+    if (!ip || typeof ip !== 'string') return false;
+    const trimmed = ip.trim();
+    const ipv4Regex =
+      /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    return ipv4Regex.test(trimmed);
+  }
+
+  static validateSerialConfirmation(actualSerial: string, confirmedSerial: string): boolean {
+    if (!actualSerial || !confirmedSerial) return false;
+    return actualSerial.trim() === confirmedSerial.trim();
+  }
+
+  static buildChangeGatewayConfig(
+    dto: GatewayRegistrationSessionDTO,
+    networkServerHost?: string
+  ): ChangeGatewayConfigRequest {
+    const is4G =
+      dto.internet_test_type === 'lte_4g' ||
+      dto.internet_test_type === '4G Test';
+
+    const normalizedRegion = (dto.region_test || 'EU868').toLowerCase();
+
+    return {
+      gatewayConfig: {
+        ethernet_metric: is4G ? '102' : '100',
+        lte_metric: is4G ? '100' : '102',
+        wifi_metric: '101',
+        is_reboot: 'false',
+        lorawan_frequency_plan: normalizedRegion,
+        network_server_host: networkServerHost || dto.network_server_host || 'localhost',
+        ns_uplink_port: '1700',
+        ns_downlink_port: '1700',
+      },
+    };
   }
 
   // --- TRACEABILITY DROPDOWN LOOKUP ---
@@ -248,5 +291,113 @@ export class TestingService {
     const limit = query?.limit || 50;
 
     return { total, items: result.slice(offset, offset + limit) };
+  }
+
+  // --- GATEWAY TEST SESSIONS MANAGEMENT ---
+
+  async createGatewayTestSession(dto: GatewayRegistrationSessionDTO): Promise<GatewayTestSession> {
+    if (!dto.so?.trim()) {
+      throw new Error('SO is required for Gateway Test Session');
+    }
+    if (!dto.wa?.trim()) {
+      throw new Error('WA is required for Gateway Test Session');
+    }
+    if (!dto.gateway_ip?.trim() || !TestingService.validateGatewayIp(dto.gateway_ip)) {
+      throw new Error(`Invalid Gateway IP format: "${dto.gateway_ip}". Expected IPv4 format (x.x.x.x)`);
+    }
+    if (!dto.network_server_id?.trim()) {
+      throw new Error('network_server_id is required');
+    }
+
+    const info = dto.gateway_info;
+    const serial = info?.serial_number || dto.confirmed_serial_number;
+
+    if (!serial) {
+      throw new Error('Serial number is missing from gateway info');
+    }
+
+    if (!TestingService.validateSerialConfirmation(serial, dto.confirmed_serial_number)) {
+      throw new Error(`Confirmed serial "${dto.confirmed_serial_number}" does not match actual serial "${serial}"`);
+    }
+
+    const sessionId = `gw-sess-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const sessionCode = `GW-${serial.toUpperCase()}-${Date.now().toString().slice(-6)}`;
+    const eui = info?.eui || `eui-${serial}`;
+    const itemCode = info?.item_code || 'UNKNOWN_ITEM';
+    const sku = info?.sku || 'UNKNOWN_SKU';
+
+    const forwarderConfig = TestingService.buildChangeGatewayConfig(dto, dto.network_server_host);
+
+    const session: GatewayTestSession = {
+      id: sessionId,
+      session_code: sessionCode,
+      gateway_ip: dto.gateway_ip.trim(),
+      serial_number: serial,
+      eui,
+      item_code: itemCode,
+      sku,
+      firmware_version: info?.firmware_version,
+      hardware_version: info?.hardware_version,
+      mechanical_version: info?.mechanical_version,
+      lte_module_serial_number: info?.lte_module_serial_number,
+      lte_module_imei: info?.lte_module_imei,
+      so: dto.so.trim(),
+      wa: dto.wa.trim(),
+      network_server_id: dto.network_server_id.trim(),
+      internet_test_type: dto.internet_test_type,
+      region_test: dto.region_test,
+      status: 'REGISTERED',
+      gateway_config: info,
+      packet_forwarder_config: forwarderConfig.gatewayConfig,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    this.gatewaySessions.set(session.id, session);
+
+    // Đồng thời đồng bộ sang TestingDevice để phục vụ màn hình danh sách thiết bị
+    const existingDev = Array.from(this.devices.values()).find(
+      (d) => d.serial_number === serial || d.network_id === eui
+    );
+
+    const deviceRecord: TestingDevice = {
+      id: existingDev?.id || `dev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      serial_number: serial,
+      device_name: `Gateway ${sku} (${serial})`,
+      device_type: 'lorawan_gateway',
+      network_type: 'lorawan_gateway',
+      network_id: eui,
+      so: dto.so.trim(),
+      wa: dto.wa.trim(),
+      item_code: itemCode,
+      status: 'REGISTERED',
+      metadata: {
+        sku,
+        firmware_version: info?.firmware_version,
+        hardware_version: info?.hardware_version,
+        mechanical_version: info?.mechanical_version,
+        lte_module_serial_number: info?.lte_module_serial_number,
+        lte_module_imei: info?.lte_module_imei,
+        gateway_ip: dto.gateway_ip.trim(),
+        internet_test_type: dto.internet_test_type,
+        region_test: dto.region_test,
+        last_session_id: session.id,
+      },
+      created_at: existingDev?.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.devices.set(deviceRecord.id, deviceRecord);
+
+    return session;
+  }
+
+  async getGatewayTestSessions(): Promise<GatewayTestSession[]> {
+    return Array.from(this.gatewaySessions.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }
+
+  async getGatewayTestSessionById(id: string): Promise<GatewayTestSession | null> {
+    return this.gatewaySessions.get(id) || null;
   }
 }
