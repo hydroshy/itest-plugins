@@ -15,6 +15,9 @@ import {
   AutoCheckCriteria,
   AutoCheckRuleResult,
   AutoCheckEvaluation,
+  DeviceTestSession,
+  DeviceTestSessionStatus,
+  CreateDeviceTestDTO,
 } from './testing.types';
 import { ITraceabilityProvider, DefaultTraceabilityBridge } from './testing-traceability.bridge';
 import { PacketProcessor } from './packet-processor';
@@ -26,6 +29,7 @@ export class TestingService {
   private simulationProfiles: Map<string, DeviceSimulationProfile> = new Map();
   private simulationResults: Map<string, DeviceSimulationResult> = new Map();
   private autoCheckEvaluations: Map<string, AutoCheckEvaluation> = new Map();
+  private deviceTestSessions: Map<string, DeviceTestSession> = new Map();
   private traceabilityProvider: ITraceabilityProvider;
 
   constructor(traceabilityProvider?: ITraceabilityProvider) {
@@ -707,4 +711,83 @@ export class TestingService {
   async getAutoCheckEvaluationById(id: string): Promise<AutoCheckEvaluation | null> {
     return this.autoCheckEvaluations.get(id) || null;
   }
+
+  // --- CREATE DEVICE TESTING SESSIONS ---
+
+  async createDeviceTestSession(dto: CreateDeviceTestDTO): Promise<DeviceTestSession> {
+    const serialNumber = (dto.serial_number || dto.serialNumber || '').trim();
+    if (!serialNumber) {
+      throw new Error('Số Serial (serial_number) là bắt buộc để tạo phiên kiểm thử thiết bị.');
+    }
+
+    const sessionId = `dev-test-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const sessionName =
+      dto.session_name ||
+      dto.sessionName ||
+      `Kiểm thử thiết bị ${serialNumber} - ${new Date().toLocaleTimeString('vi-VN')}`;
+
+    const session: DeviceTestSession = {
+      id: sessionId,
+      session_name: sessionName,
+      device_id: dto.device_id || dto.deviceId,
+      serial_number: serialNumber,
+      network_id: dto.network_id || dto.networkId,
+      connectivity: (dto.connectivity as any) || 'LoRaWAN',
+      item_code: dto.item_code || dto.itemCode,
+      sku: dto.sku,
+      profile_id: dto.profile_id || dto.profileId,
+      flow_blocks: dto.flow_blocks || dto.flowBlocks || [],
+      auto_check_criteria: dto.auto_check_criteria || dto.autoCheckCriteria,
+      status: 'IDLE',
+      verdict: 'PENDING',
+      total_packets_sent: 0,
+      metadata: dto.metadata || {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    this.deviceTestSessions.set(sessionId, session);
+    return session;
+  }
+
+  async getDeviceTestSessions(): Promise<DeviceTestSession[]> {
+    return Array.from(this.deviceTestSessions.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }
+
+  async getDeviceTestSessionById(id: string): Promise<DeviceTestSession | null> {
+    return this.deviceTestSessions.get(id) || null;
+  }
+
+  async updateDeviceTestSessionStatus(
+    id: string,
+    status: DeviceTestSessionStatus,
+    evaluation?: AutoCheckEvaluation
+  ): Promise<DeviceTestSession | null> {
+    const session = this.deviceTestSessions.get(id);
+    if (!session) return null;
+
+    session.status = status;
+    session.updated_at = new Date().toISOString();
+
+    if (status === 'RUNNING' && !session.started_at) {
+      session.started_at = new Date().toISOString();
+    }
+
+    if (evaluation) {
+      session.evaluation = evaluation;
+      session.verdict = evaluation.verdict;
+    }
+
+    if (status === 'PASSED' || status === 'FAILED' || status === 'CANCELLED') {
+      session.completed_at = new Date().toISOString();
+      if (!session.verdict || session.verdict === 'PENDING') {
+        session.verdict = status === 'PASSED' ? 'PASS' : status === 'FAILED' ? 'FAIL' : 'PENDING';
+      }
+    }
+
+    return session;
+  }
 }
+

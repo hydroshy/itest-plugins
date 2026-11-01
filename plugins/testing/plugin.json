@@ -23,6 +23,11 @@
       "namespace": "testing",
       "resource": "packet",
       "action": "write"
+    },
+    {
+      "namespace": "testing",
+      "resource": "device-test",
+      "action": "manage"
     }
   ],
   "ui": {

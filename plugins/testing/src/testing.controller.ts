@@ -1,9 +1,11 @@
 import { TestingService } from './testing.service';
 import {
   AutoCheckCriteria,
+  CreateDeviceTestDTO,
   DeviceFilterQuery,
   DeviceRegistrationDTO,
   DeviceSimulationProfile,
+  DeviceTestSessionStatus,
   GatewayRegistrationSessionDTO,
 } from './testing.types';
 
@@ -205,5 +207,64 @@ export class TestingController {
       total: evaluations.length,
     };
   }
+
+  // 7. Create Device Testing Sessions
+  async createDeviceTestSession(dto: CreateDeviceTestDTO) {
+    try {
+      const session = await this.service.createDeviceTestSession(dto);
+      return {
+        success: true,
+        message: 'Tạo phiên kiểm thử thiết bị thành công',
+        data: session,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err?.message || 'Không thể tạo phiên kiểm thử thiết bị',
+        statusCode: 400,
+      };
+    }
+  }
+
+  async listDeviceTestSessions() {
+    const sessions = await this.service.getDeviceTestSessions();
+    return {
+      success: true,
+      data: sessions,
+      total: sessions.length,
+    };
+  }
+
+  async getDeviceTestSession(id: string) {
+    const session = await this.service.getDeviceTestSessionById(id);
+    if (!session) {
+      return {
+        success: false,
+        message: 'Phiên kiểm thử thiết bị không tồn tại',
+        statusCode: 404,
+      };
+    }
+    return {
+      success: true,
+      data: session,
+    };
+  }
+
+  async updateDeviceTestSessionStatus(id: string, status: DeviceTestSessionStatus) {
+    const updated = await this.service.updateDeviceTestSessionStatus(id, status);
+    if (!updated) {
+      return {
+        success: false,
+        message: 'Không tìm thấy phiên kiểm thử để cập nhật',
+        statusCode: 404,
+      };
+    }
+    return {
+      success: true,
+      message: `Cập nhật trạng thái phiên test thành công: ${status}`,
+      data: updated,
+    };
+  }
 }
+
 

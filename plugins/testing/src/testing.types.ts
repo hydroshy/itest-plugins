@@ -292,3 +292,58 @@ export interface AutoCheckEvaluation {
   };
 }
 
+export type DeviceTestSessionStatus =
+  | 'IDLE'
+  | 'RUNNING'
+  | 'EVALUATING'
+  | 'PASSED'
+  | 'FAILED'
+  | 'CANCELLED';
+
+export interface DeviceTestSession {
+  id: string;
+  session_name: string;
+  device_id?: string;
+  serial_number: string;
+  network_id?: string;
+  connectivity?: 'LoRaWAN' | 'Sigfox' | string;
+  item_code?: string;
+  sku?: string;
+  profile_id?: string;
+  flow_blocks?: any[];
+  auto_check_criteria?: AutoCheckCriteria;
+  status: DeviceTestSessionStatus;
+  verdict?: 'PASS' | 'FAIL' | 'PENDING';
+  total_packets_sent?: number;
+  last_packet_at?: Date | string;
+  evaluation?: AutoCheckEvaluation;
+  metadata?: Record<string, any>;
+  started_at?: Date | string;
+  completed_at?: Date | string;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+export interface CreateDeviceTestDTO {
+  session_name?: string;
+  sessionName?: string;
+  device_id?: string;
+  deviceId?: string;
+  serial_number: string;
+  serialNumber?: string;
+  network_id?: string;
+  networkId?: string;
+  connectivity?: 'LoRaWAN' | 'Sigfox' | string;
+  item_code?: string;
+  itemCode?: string;
+  sku?: string;
+  profile_id?: string;
+  profileId?: string;
+  flow_blocks?: any[];
+  flowBlocks?: any[];
+  auto_check_criteria?: AutoCheckCriteria;
+  autoCheckCriteria?: AutoCheckCriteria;
+  metadata?: Record<string, any>;
+}
+
+

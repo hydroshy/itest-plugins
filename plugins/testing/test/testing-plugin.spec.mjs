@@ -5,6 +5,7 @@ import { TestingPlugin, PacketProcessor, TestingService } from '../dist/index.js
 describe('Testing Plugin Tests', () => {
   const plugin = new TestingPlugin();
   const service = plugin.getService();
+  const controller = plugin.getController();
 
   describe('1. Traceability Lookup', () => {
     it('should fetch available SO list', async () => {
@@ -294,5 +295,49 @@ describe('Testing Plugin Tests', () => {
       );
     });
   });
+
+  describe('5. Create Device Testing Session & Flow Coordination', () => {
+    it('should create device test session with serial, connectivity and auto check criteria', async () => {
+      const res = await controller.createDeviceTestSession({
+        serial_number: 'SN-DEV-TEST-001',
+        network_id: '0004A30B001F0099',
+        connectivity: 'LoRaWAN',
+        item_code: '5F0820',
+        sku: 'WSLRW-TH01',
+        auto_check_criteria: {
+          min_rssi: -100,
+          expected_f_port: 2,
+        },
+      });
+
+      assert.strictEqual(res.success, true);
+      assert.ok(res.data.id.startsWith('dev-test-'));
+      assert.strictEqual(res.data.serial_number, 'SN-DEV-TEST-001');
+      assert.strictEqual(res.data.status, 'IDLE');
+      assert.strictEqual(res.data.verdict, 'PENDING');
+      assert.strictEqual(res.data.connectivity, 'LoRaWAN');
+    });
+
+    it('should reject device test creation when serial number is missing', async () => {
+      const res = await controller.createDeviceTestSession({
+        serial_number: '',
+      });
+      assert.strictEqual(res.success, false);
+      assert.ok(res.message.includes('bắt buộc'));
+    });
+
+    it('should list device test sessions and update status', async () => {
+      const listRes = await controller.listDeviceTestSessions();
+      assert.strictEqual(listRes.success, true);
+      assert.ok(listRes.total >= 1);
+
+      const sessionId = listRes.data[0].id;
+      const updateRes = await controller.updateDeviceTestSessionStatus(sessionId, 'RUNNING');
+      assert.strictEqual(updateRes.success, true);
+      assert.strictEqual(updateRes.data.status, 'RUNNING');
+      assert.ok(updateRes.data.started_at);
+    });
+  });
 });
+
 
