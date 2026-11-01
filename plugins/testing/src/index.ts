@@ -5,6 +5,7 @@ import { DefaultTraceabilityBridge } from './testing-traceability.bridge';
 export * from './testing.types';
 export * from './testing-traceability.bridge';
 export * from './packet-processor';
+export * from './ath-register-decoder';
 export * from './testing.service';
 export * from './testing.controller';
 

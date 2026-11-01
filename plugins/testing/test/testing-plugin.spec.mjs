@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { TestingPlugin, PacketProcessor, TestingService } from '../dist/index.js';
+import { TestingPlugin, PacketProcessor, TestingService, ATHRegisterDecoder } from '../dist/index.js';
 
 describe('Testing Plugin Tests', () => {
   const plugin = new TestingPlugin();
@@ -336,6 +336,103 @@ describe('Testing Plugin Tests', () => {
       assert.strictEqual(updateRes.success, true);
       assert.strictEqual(updateRes.data.status, 'RUNNING');
       assert.ok(updateRes.data.started_at);
+    });
+  });
+
+  describe('6. ATH Register Decoder & ChirpStack Provisioning Helpers', () => {
+    it('should correctly decode ATH registers from Modbus memory map', () => {
+      const mem = new Map();
+
+      // Reg 0: 'ATH' (string)
+      mem.set(0, [65, 84]); // 'AT'
+      mem.set(1, [72, 0]);  // 'H\0'
+
+      // Reg 27: devEUI (4 regs hex) = 00 04 A3 0B 00 1F 00 99
+      mem.set(27, [0x00, 0x04]);
+      mem.set(28, [0xa3, 0x0b]);
+      mem.set(29, [0x00, 0x1f]);
+      mem.set(30, [0x00, 0x99]);
+
+      // Reg 31: appEUI (4 regs hex) = 01 02 03 04 05 06 07 08
+      mem.set(31, [0x01, 0x02]);
+      mem.set(32, [0x03, 0x04]);
+      mem.set(33, [0x05, 0x06]);
+      mem.set(34, [0x07, 0x08]);
+
+      // Reg 35: appKey (8 regs hex)
+      for (let i = 0; i < 8; i++) {
+        mem.set(35 + i, [0xaa, 0xbb]);
+      }
+
+      // Reg 69: region code 'AS9' '23'
+      mem.set(69, [65, 83]); // 'AS'
+      mem.set(70, [57, 50]); // '92'
+      mem.set(71, [51, 0]);  // '3\0'
+
+      // Reg 85: class 'A'
+      mem.set(85, [65, 0]);
+
+      // Reg 103: sensor type = 10 (0x000A)
+      mem.set(103, [0x00, 0x0a]);
+
+      // Reg 259: SERIAL_NUMBER = 'SN-2026'
+      mem.set(259, [83, 78]); // 'SN'
+      mem.set(260, [45, 50]); // '-2'
+      mem.set(261, [48, 50]); // '02'
+      mem.set(262, [54, 0]);  // '6\0'
+
+      // Reg 386: ITEM_CODE = 'ATH01'
+      mem.set(386, [65, 84]); // 'AT'
+      mem.set(387, [72, 48]); // 'H0'
+      mem.set(388, [49, 0]);  // '1\0'
+
+      const decoded = ATHRegisterDecoder.decodeFromMemoryMap(mem);
+      assert.strictEqual(decoded.fwCode, 'ATH');
+      assert.strictEqual(decoded.devEui, '0004A30B001F0099');
+      assert.strictEqual(decoded.appEui, '0102030405060708');
+      assert.strictEqual(decoded.regionCode, 'AS923');
+      assert.strictEqual(decoded.deviceClass, 'A');
+      assert.strictEqual(decoded.sensorType, 10);
+      assert.strictEqual(decoded.serialNumber, 'SN-2026');
+      assert.strictEqual(decoded.itemCode, 'ATH01');
+    });
+
+    it('should generate 4 optimized fast-read chunks covering 0..259 and 386', () => {
+      const chunks = ATHRegisterDecoder.getFastReadChunks();
+      assert.strictEqual(chunks.length, 4);
+      assert.strictEqual(chunks[0].start, 0);
+      assert.strictEqual(chunks[0].count, 100);
+      assert.strictEqual(chunks[1].start, 100);
+      assert.strictEqual(chunks[1].count, 100);
+      assert.strictEqual(chunks[2].start, 200);
+      assert.strictEqual(chunks[2].count, 68);
+      assert.strictEqual(chunks[3].start, 386);
+      assert.strictEqual(chunks[3].count, 14);
+    });
+
+    it('should build ChirpStack 2-step registration payloads (Device & Keys)', () => {
+      const devPayload = ATHRegisterDecoder.buildChirpstackDevicePayload({
+        applicationId: 'app-uuid-001',
+        devEui: '0004A30B001F0099',
+        joinEui: '0102030405060708',
+        serialNumber: 'SN-ATH-001',
+        deviceProfileId: 'dp-lorawan-as923-class-a',
+      });
+
+      assert.strictEqual(devPayload.device.devEui, '0004a30b001f0099');
+      assert.strictEqual(devPayload.device.joinEui, '0102030405060708');
+      assert.strictEqual(devPayload.device.name, 'SN-ATH-001');
+      assert.strictEqual(devPayload.device.skipFcntCheck, true);
+      assert.strictEqual(devPayload.device.description, 'ITEST 2.0');
+
+      const keysPayload = ATHRegisterDecoder.buildChirpstackKeysPayload({
+        devEui: '0004A30B001F0099',
+        appKey: 'AABBCCDDEEFF00112233445566778899',
+      });
+
+      assert.strictEqual(keysPayload.deviceKeys.devEui, '0004a30b001f0099');
+      assert.strictEqual(keysPayload.deviceKeys.appKey, 'aabbccddeeff00112233445566778899');
+      assert.strictEqual(keysPayload.deviceKeys.nwkKey, 'aabbccddeeff00112233445566778899');
     });
   });
 });
