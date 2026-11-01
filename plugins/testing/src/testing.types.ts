@@ -215,3 +215,80 @@ export interface GatewayTestSession {
   updated_at: Date | string;
 }
 
+export interface DeviceSimulationProfile {
+  id?: string;
+  name?: string;
+  dev_eui: string;
+  app_eui?: string;
+  app_key?: string;
+  serial_number?: string;
+  so_number?: string;
+  wa_number?: string;
+  item_code?: string;
+  region?: string;
+  class_type?: 'A' | 'B' | 'C';
+  packet_type?: PacketType;
+  f_port?: number;
+  f_cnt?: number;
+  payload_hex?: string;
+  decoded_payload?: Record<string, any>;
+  interval_ms?: number;
+  burst_count?: number;
+  rf_info?: {
+    rssi?: number;
+    snr?: number;
+    frequency?: number;
+    gateway_id?: string;
+    channel?: number;
+    sf?: number;
+    bw?: number;
+  };
+}
+
+export interface DeviceSimulationResult {
+  simulation_id: string;
+  dev_eui: string;
+  serial_number?: string;
+  status: 'completed' | 'running' | 'stopped';
+  packets_generated: DevicePacketDTO[];
+  started_at: Date | string;
+  completed_at?: Date | string;
+}
+
+export interface AutoCheckCriteria {
+  min_rssi?: number;
+  max_rssi?: number;
+  min_snr?: number;
+  expected_f_port?: number;
+  required_fields?: string[];
+  field_rules?: Record<string, { min?: number; max?: number; equals?: any }>;
+}
+
+export interface AutoCheckRuleResult {
+  rule: string;
+  passed: boolean;
+  actual: any;
+  expected: any;
+  message?: string;
+}
+
+export interface AutoCheckEvaluation {
+  evaluation_id: string;
+  serial_number?: string;
+  network_id?: string;
+  verdict: 'PASS' | 'FAIL';
+  total_rules: number;
+  passed_rules: number;
+  failed_rules: number;
+  rule_results: AutoCheckRuleResult[];
+  evaluated_at: Date | string;
+  packet_summary?: {
+    raw_payload?: string;
+    f_port?: number;
+    f_cnt?: number;
+    rssi?: number;
+    snr?: number;
+    decoded?: Record<string, any>;
+  };
+}
+

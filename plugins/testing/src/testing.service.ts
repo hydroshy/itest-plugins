@@ -10,6 +10,11 @@ import {
   TraceabilityLookupItemCode,
   TraceabilityLookupSO,
   TraceabilityLookupWA,
+  DeviceSimulationProfile,
+  DeviceSimulationResult,
+  AutoCheckCriteria,
+  AutoCheckRuleResult,
+  AutoCheckEvaluation,
 } from './testing.types';
 import { ITraceabilityProvider, DefaultTraceabilityBridge } from './testing-traceability.bridge';
 import { PacketProcessor } from './packet-processor';
@@ -18,6 +23,9 @@ export class TestingService {
   private devices: Map<string, TestingDevice> = new Map();
   private packets: DevicePacketDTO[] = [];
   private gatewaySessions: Map<string, GatewayTestSession> = new Map();
+  private simulationProfiles: Map<string, DeviceSimulationProfile> = new Map();
+  private simulationResults: Map<string, DeviceSimulationResult> = new Map();
+  private autoCheckEvaluations: Map<string, AutoCheckEvaluation> = new Map();
   private traceabilityProvider: ITraceabilityProvider;
 
   constructor(traceabilityProvider?: ITraceabilityProvider) {
@@ -399,5 +407,304 @@ export class TestingService {
 
   async getGatewayTestSessionById(id: string): Promise<GatewayTestSession | null> {
     return this.gatewaySessions.get(id) || null;
+  }
+
+  // --- DEVICE SIMULATION FLOW ---
+
+  async saveSimulationProfile(profile: DeviceSimulationProfile): Promise<DeviceSimulationProfile> {
+    const id = profile.id || `sim-prof-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const saved: DeviceSimulationProfile = {
+      ...profile,
+      id,
+      dev_eui: profile.dev_eui.trim().toUpperCase(),
+    };
+    this.simulationProfiles.set(id, saved);
+    return saved;
+  }
+
+  async getSimulationProfiles(): Promise<DeviceSimulationProfile[]> {
+    return Array.from(this.simulationProfiles.values());
+  }
+
+  async getSimulationProfileById(id: string): Promise<DeviceSimulationProfile | null> {
+    return this.simulationProfiles.get(id) || null;
+  }
+
+  async simulateDeviceUplink(profile: DeviceSimulationProfile): Promise<DeviceSimulationResult> {
+    const simulationId = `sim-run-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const startedAt = new Date().toISOString();
+    const burstCount = Math.max(1, Math.min(profile.burst_count || 1, 100));
+    const generatedPackets: DevicePacketDTO[] = [];
+
+    const devEui = profile.dev_eui.trim().toUpperCase();
+    let existingDev = await this.getDeviceByNetworkId(devEui);
+    if (!existingDev && profile.serial_number && (profile.so_number || profile.wa_number)) {
+      try {
+        existingDev = await this.registerDevice({
+          serial_number: profile.serial_number,
+          device_name: profile.name || `Simulated-${devEui.substring(devEui.length - 4)}`,
+          device_type: 'lorawan_node',
+          network_type: 'lorawan',
+          network_id: devEui,
+          so: profile.so_number || 'SO-SIM-DEFAULT',
+          wa: profile.wa_number || 'WA-SIM-DEFAULT',
+          item_code: profile.item_code || 'ITEM-SIM',
+        });
+      } catch (e) {
+        // Ignored if already registered
+      }
+    }
+
+    let currentFCnt = profile.f_cnt ?? 1;
+
+    for (let i = 0; i < burstCount; i++) {
+      let rawHex = profile.payload_hex || '01020304';
+      if (!profile.payload_hex && profile.decoded_payload) {
+        rawHex = Buffer.from(JSON.stringify(profile.decoded_payload)).toString('hex');
+      }
+
+      const baseRssi = profile.rf_info?.rssi ?? -75;
+      const baseSnr = profile.rf_info?.snr ?? 9;
+      const rssi = Math.round(baseRssi + (Math.random() * 4 - 2));
+      const snr = parseFloat((baseSnr + (Math.random() * 2 - 1)).toFixed(1));
+
+      const packet = await this.recordPacket({
+        network_id: devEui,
+        raw_payload: rawHex,
+        f_port: profile.f_port ?? 1,
+        f_cnt: currentFCnt++,
+        direction: 'uplink',
+        rf_info: {
+          rssi,
+          snr,
+          frequency: profile.rf_info?.frequency ?? 868100000,
+          gateway_id: profile.rf_info?.gateway_id ?? 'gw-sim-01',
+        },
+      });
+
+      if (profile.decoded_payload && Object.keys(profile.decoded_payload).length > 0) {
+        packet.decoded_payload = { ...packet.decoded_payload, ...profile.decoded_payload };
+      }
+
+      generatedPackets.push(packet);
+    }
+
+    const result: DeviceSimulationResult = {
+      simulation_id: simulationId,
+      dev_eui: devEui,
+      serial_number: profile.serial_number,
+      status: 'completed',
+      packets_generated: generatedPackets,
+      started_at: startedAt,
+      completed_at: new Date().toISOString(),
+    };
+
+    this.simulationResults.set(simulationId, result);
+    return result;
+  }
+
+  async getSimulationResults(): Promise<DeviceSimulationResult[]> {
+    return Array.from(this.simulationResults.values()).sort(
+      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+    );
+  }
+
+  async getSimulationResultById(id: string): Promise<DeviceSimulationResult | null> {
+    return this.simulationResults.get(id) || null;
+  }
+
+  // --- DEVICE AUTO CHECK FLOW ---
+
+  getDefaultAutoCheckRules(): AutoCheckCriteria {
+    return {
+      min_rssi: -120,
+      max_rssi: -30,
+      min_snr: -15,
+      expected_f_port: 1,
+      required_fields: ['dev_eui', 'payload', 'f_port'],
+      field_rules: {},
+    };
+  }
+
+  async evaluateAutoCheck(
+    target: {
+      packet?: DevicePacketDTO;
+      packet_id?: string;
+      dev_eui?: string;
+      serial_number?: string;
+    },
+    criteria?: AutoCheckCriteria
+  ): Promise<AutoCheckEvaluation> {
+    const rules = { ...this.getDefaultAutoCheckRules(), ...(criteria || {}) };
+    let packet: DevicePacketDTO | undefined = target.packet;
+
+    if (!packet && target.packet_id) {
+      packet = this.packets.find((p) => p.id === target.packet_id);
+    }
+
+    if (!packet && (target.dev_eui || target.serial_number)) {
+      let deviceId: string | undefined;
+      if (target.serial_number) {
+        for (const d of this.devices.values()) {
+          if (d.serial_number.toLowerCase() === target.serial_number.toLowerCase()) {
+            deviceId = d.id;
+            break;
+          }
+        }
+      }
+      const list = await this.getPackets({
+        network_id: target.dev_eui,
+        device_id: deviceId,
+        limit: 1,
+      });
+      if (list.items.length > 0) {
+        packet = list.items[0];
+      }
+    }
+
+    if (!packet) {
+      throw new Error('No packet found matching the target criteria for Auto Check evaluation.');
+    }
+
+    const ruleResults: AutoCheckRuleResult[] = [];
+
+    // Rule 1: RSSI Signal Range
+    const rssi = packet.rf_info?.rssi;
+    if (rules.min_rssi !== undefined || rules.max_rssi !== undefined) {
+      const min = rules.min_rssi ?? -140;
+      const max = rules.max_rssi ?? 0;
+      const passed = rssi !== undefined && rssi >= min && rssi <= max;
+      ruleResults.push({
+        rule: 'RSSI_RANGE_CHECK',
+        passed,
+        actual: rssi,
+        expected: `Between ${min} dBm and ${max} dBm`,
+        message: passed ? `RSSI ${rssi} dBm is within valid range` : `RSSI ${rssi} dBm out of range [${min}, ${max}]`,
+      });
+    }
+
+    // Rule 2: SNR Signal Quality
+    const snr = packet.rf_info?.snr;
+    if (rules.min_snr !== undefined) {
+      const passed = snr !== undefined && snr >= rules.min_snr;
+      ruleResults.push({
+        rule: 'SNR_MIN_CHECK',
+        passed,
+        actual: snr,
+        expected: `>= ${rules.min_snr} dB`,
+        message: passed ? `SNR ${snr} dB meets requirement` : `SNR ${snr} dB is below threshold ${rules.min_snr} dB`,
+      });
+    }
+
+    // Rule 3: fPort Check
+    if (rules.expected_f_port !== undefined) {
+      const passed = packet.f_port === rules.expected_f_port;
+      ruleResults.push({
+        rule: 'FPORT_MATCH_CHECK',
+        passed,
+        actual: packet.f_port,
+        expected: rules.expected_f_port,
+        message: passed ? `fPort ${packet.f_port} matched` : `Expected fPort ${rules.expected_f_port}, got ${packet.f_port}`,
+      });
+    }
+
+    // Rule 4: Required Fields in Packet / Decoded Payload
+    if (rules.required_fields && rules.required_fields.length > 0) {
+      for (const field of rules.required_fields) {
+        let actualVal: any;
+        if (field === 'dev_eui' || field === 'network_id') actualVal = packet.network_id;
+        else if (field === 'payload' || field === 'raw_payload') actualVal = packet.raw_payload;
+        else if (field === 'f_port') actualVal = packet.f_port;
+        else if (field === 'f_cnt') actualVal = packet.f_cnt;
+        else actualVal = packet.decoded_payload?.[field];
+
+        const passed = actualVal !== undefined && actualVal !== null && actualVal !== '';
+        ruleResults.push({
+          rule: `FIELD_REQUIRED_${field.toUpperCase()}`,
+          passed,
+          actual: actualVal ?? null,
+          expected: 'Non-empty value',
+          message: passed ? `Field '${field}' present` : `Missing required field '${field}'`,
+        });
+      }
+    }
+
+    // Rule 5: Specific Field Rules
+    if (rules.field_rules && typeof rules.field_rules === 'object') {
+      for (const [field, rule] of Object.entries(rules.field_rules)) {
+        const actualVal = packet.decoded_payload?.[field];
+        let passed = true;
+        let failReason = '';
+
+        if (actualVal === undefined || actualVal === null) {
+          passed = false;
+          failReason = `Field '${field}' missing from decoded payload`;
+        } else {
+          if (rule.equals !== undefined && actualVal !== rule.equals) {
+            passed = false;
+            failReason = `Expected ${rule.equals}, got ${actualVal}`;
+          }
+          if (rule.min !== undefined && (typeof actualVal !== 'number' || actualVal < rule.min)) {
+            passed = false;
+            failReason = `Expected >= ${rule.min}, got ${actualVal}`;
+          }
+          if (rule.max !== undefined && (typeof actualVal !== 'number' || actualVal > rule.max)) {
+            passed = false;
+            failReason = `Expected <= ${rule.max}, got ${actualVal}`;
+          }
+        }
+
+        ruleResults.push({
+          rule: `FIELD_VALUE_RULE_${field.toUpperCase()}`,
+          passed,
+          actual: actualVal,
+          expected: rule,
+          message: passed ? `Rule for '${field}' passed` : failReason,
+        });
+      }
+    }
+
+    const passedCount = ruleResults.filter((r) => r.passed).length;
+    const failedCount = ruleResults.length - passedCount;
+    const verdict = failedCount === 0 ? 'PASS' : 'FAIL';
+
+    let serialNumber = target.serial_number;
+    if (!serialNumber && packet.device_id) {
+      const dev = await this.getDeviceById(packet.device_id);
+      serialNumber = dev?.serial_number;
+    }
+
+    const evaluation: AutoCheckEvaluation = {
+      evaluation_id: `chk-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      serial_number: serialNumber,
+      network_id: packet.network_id,
+      verdict,
+      total_rules: ruleResults.length,
+      passed_rules: passedCount,
+      failed_rules: failedCount,
+      rule_results: ruleResults,
+      evaluated_at: new Date().toISOString(),
+      packet_summary: {
+        raw_payload: packet.raw_payload,
+        f_port: packet.f_port,
+        f_cnt: packet.f_cnt,
+        rssi: packet.rf_info?.rssi,
+        snr: packet.rf_info?.snr,
+        decoded: packet.decoded_payload,
+      },
+    };
+
+    this.autoCheckEvaluations.set(evaluation.evaluation_id, evaluation);
+    return evaluation;
+  }
+
+  async getAutoCheckEvaluations(): Promise<AutoCheckEvaluation[]> {
+    return Array.from(this.autoCheckEvaluations.values()).sort(
+      (a, b) => new Date(b.evaluated_at).getTime() - new Date(a.evaluated_at).getTime()
+    );
+  }
+
+  async getAutoCheckEvaluationById(id: string): Promise<AutoCheckEvaluation | null> {
+    return this.autoCheckEvaluations.get(id) || null;
   }
 }

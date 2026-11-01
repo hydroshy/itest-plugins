@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import assert from 'node:assert';
+import * as assert from 'node:assert';
 import { TestingService } from '../src/testing.service';
 import { PacketProcessor } from '../src/packet-processor';
 import { TestingPlugin } from '../src/index';
@@ -294,6 +294,113 @@ describe('Testing Plugin Tests', () => {
         },
         /Invalid Gateway IP format/
       );
+    });
+  });
+
+  describe('5. LoRaWAN Device Simulation Flow', () => {
+    it('should save and list simulation profiles', async () => {
+      const profile = await service.saveSimulationProfile({
+        name: 'Weather Node AS923 Profile',
+        dev_eui: '70B3D57ED001A1B2',
+        serial_number: 'SN-WEATHER-01',
+        region: 'AS923',
+        packet_type: 'UNCONFIRMED_DATA_UP',
+        f_port: 2,
+        burst_count: 3,
+        payload_hex: '01020304',
+        decoded_payload: { temperature: 26.5, humidity: 65 },
+        rf_info: { rssi: -72, snr: 9.5 },
+      });
+
+      assert.ok(profile.id);
+      assert.strictEqual(profile.dev_eui, '70B3D57ED001A1B2');
+
+      const profiles = await service.getSimulationProfiles();
+      assert.strictEqual(profiles.length >= 1, true);
+    });
+
+    it('should execute simulation and generate uplink packets with sequential f_cnt', async () => {
+      const result = await service.simulateDeviceUplink({
+        name: 'Smart Meter Simulation',
+        dev_eui: '70B3D57ED002C3D4',
+        serial_number: 'SN-METER-99',
+        so_number: 'SO-2026-10-001',
+        wa_number: 'WA-001-A',
+        item_code: '5F0820',
+        burst_count: 3,
+        f_cnt: 100,
+        f_port: 1,
+        payload_hex: '0A0B0C0D',
+        decoded_payload: { active_power: 1200, status: 'OK' },
+        rf_info: { rssi: -68, snr: 10.2 },
+      });
+
+      assert.ok(result.simulation_id);
+      assert.strictEqual(result.dev_eui, '70B3D57ED002C3D4');
+      assert.strictEqual(result.status, 'completed');
+      assert.strictEqual(result.packets_generated.length, 3);
+      assert.strictEqual(result.packets_generated[0].f_cnt, 100);
+      assert.strictEqual(result.packets_generated[1].f_cnt, 101);
+      assert.strictEqual(result.packets_generated[2].f_cnt, 102);
+      assert.strictEqual(result.packets_generated[0].decoded_payload?.active_power, 1200);
+
+      // Verify packets can also be queried via getPackets
+      const pkts = await service.getPackets({ network_id: '70B3D57ED002C3D4' });
+      assert.strictEqual(pkts.total >= 3, true);
+    });
+  });
+
+  describe('6. LoRaWAN Device Auto Check Flow', () => {
+    it('should evaluate Auto Check with PASS for compliant packets', async () => {
+      const simResult = await service.simulateDeviceUplink({
+        name: 'AutoCheck Target Node',
+        dev_eui: '70B3D57ED003E5F6',
+        serial_number: 'SN-AUTOCHK-PASS',
+        burst_count: 1,
+        f_port: 1,
+        payload_hex: 'A1B2C3D4',
+        decoded_payload: { battery: 95, voltage: 3.3 },
+        rf_info: { rssi: -70, snr: 8.5 },
+      });
+
+      const packet = simResult.packets_generated[0];
+      const evaluation = await service.evaluateAutoCheck(
+        { packet },
+        {
+          min_rssi: -100,
+          max_rssi: -30,
+          min_snr: -5,
+          expected_f_port: 1,
+          required_fields: ['dev_eui', 'payload', 'battery'],
+          field_rules: {
+            battery: { min: 50 },
+            voltage: { min: 3.0, max: 3.6 },
+          },
+        }
+      );
+
+      assert.ok(evaluation.evaluation_id);
+      assert.strictEqual(evaluation.verdict, 'PASS');
+      assert.strictEqual(evaluation.failed_rules, 0);
+      assert.strictEqual(evaluation.passed_rules, evaluation.total_rules);
+      assert.strictEqual(evaluation.total_rules, 8);
+    });
+
+    it('should evaluate Auto Check with FAIL when thresholds or fields are violated', async () => {
+      const evaluation = await service.evaluateAutoCheck(
+        { dev_eui: '70B3D57ED003E5F6' },
+        {
+          min_rssi: -40, // packet has around -70 dBm, so this will fail
+          min_snr: 20,   // packet has around 8.5 dB, so this will fail
+          field_rules: {
+            battery: { min: 99 }, // battery is 95, so this will fail
+          },
+        }
+      );
+
+      assert.ok(evaluation.evaluation_id);
+      assert.strictEqual(evaluation.verdict, 'FAIL');
+      assert.strictEqual(evaluation.failed_rules >= 2, true);
     });
   });
 });

@@ -1,7 +1,9 @@
 import { TestingService } from './testing.service';
 import {
+  AutoCheckCriteria,
   DeviceFilterQuery,
   DeviceRegistrationDTO,
+  DeviceSimulationProfile,
   GatewayRegistrationSessionDTO,
 } from './testing.types';
 
@@ -135,6 +137,72 @@ export class TestingController {
       success: true,
       data: result.items,
       total: result.total,
+    };
+  }
+
+  // 5. Device Simulation
+  async saveSimulationProfile(profile: DeviceSimulationProfile) {
+    const saved = await this.service.saveSimulationProfile(profile);
+    return {
+      success: true,
+      message: 'Cấu hình giả lập thiết bị đã được lưu',
+      data: saved,
+    };
+  }
+
+  async listSimulationProfiles() {
+    const profiles = await this.service.getSimulationProfiles();
+    return {
+      success: true,
+      data: profiles,
+      total: profiles.length,
+    };
+  }
+
+  async runSimulation(profile: DeviceSimulationProfile) {
+    const result = await this.service.simulateDeviceUplink(profile);
+    return {
+      success: true,
+      message: 'Quá trình giả lập uplink hoàn tất',
+      data: result,
+    };
+  }
+
+  async listSimulationResults() {
+    const results = await this.service.getSimulationResults();
+    return {
+      success: true,
+      data: results,
+      total: results.length,
+    };
+  }
+
+  // 6. Device Auto Check
+  getAutoCheckRules() {
+    return {
+      success: true,
+      data: this.service.getDefaultAutoCheckRules(),
+    };
+  }
+
+  async evaluateAutoCheck(payload: {
+    target: { packet?: any; packet_id?: string; dev_eui?: string; serial_number?: string };
+    criteria?: AutoCheckCriteria;
+  }) {
+    const result = await this.service.evaluateAutoCheck(payload.target, payload.criteria);
+    return {
+      success: true,
+      message: `Đánh giá Auto Check hoàn tất với kết quả: ${result.verdict}`,
+      data: result,
+    };
+  }
+
+  async listAutoCheckEvaluations() {
+    const evaluations = await this.service.getAutoCheckEvaluations();
+    return {
+      success: true,
+      data: evaluations,
+      total: evaluations.length,
     };
   }
 }
