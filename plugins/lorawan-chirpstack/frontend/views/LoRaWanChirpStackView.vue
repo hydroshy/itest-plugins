@@ -117,7 +117,7 @@
                 <span v-if="row.applicationId" class="badge badge-xs badge-primary/20 text-primary ml-1 font-mono">Default</span>
               </td>
               <td class="font-mono text-xs text-base-content/80">
-                <span class="badge badge-sm badge-ghost font-mono text-[11px] text-secondary">{{ row.deviceProfileId || '—' }}</span>
+                <span class="badge badge-sm badge-ghost font-mono text-[11px] text-info">Động theo Region</span>
               </td>
               <td class="font-mono text-xs">{{ row.version || '—' }}</td>
               <td>
@@ -472,9 +472,14 @@
             </label>
             <input v-model="serverForm.applicationId" type="text" placeholder="UUID hoặc ID Application mặc định (ví dụ: app-iot-monitoring)" class="input input-sm input-bordered bg-base-100 font-mono text-xs w-full" />
           </div>
-          <div class="form-control">
-            <label class="label py-1"><span class="label-text text-xs font-medium">Device Profile của Tenant ID *</span></label>
-            <input v-model="serverForm.deviceProfileId" type="text" placeholder="UUID Device Profile của Tenant ID (ví dụ: dp-as923-otaa)" class="input input-sm input-bordered bg-base-100 font-mono text-xs w-full" />
+          <div class="p-3 bg-base-300/40 rounded-lg border border-base-content/10 text-xs text-base-content/70 space-y-1">
+            <div class="flex items-center gap-1.5 font-semibold text-info">
+              <Cpu class="w-3.5 h-3.5" />
+              <span>Device Profile (Tự động tra cứu theo Tenant)</span>
+            </div>
+            <p class="text-[11px] leading-relaxed text-base-content/60">
+              Không gán cố định Device Profile. Hệ thống tự động gọi API <code class="text-primary font-mono text-[10px]">/api/device-profiles</code> theo Default Tenant ID và phân giải Profile tương thích với Region (Thanh ghi 69) và Class (Thanh ghi 85) khi tạo thiết bị test.
+            </p>
           </div>
           <div class="form-control">
             <label class="label py-1"><span class="label-text text-xs font-medium">Mô tả</span></label>
@@ -896,16 +901,36 @@ async function setDefaultTenant(tenantId: string) {
   }
 }
 
+async function setDefaultApplication(applicationId: string) {
+  const targetServerId = servers.value[0]?.id;
+  if (!targetServerId) {
+    cyberToast.warning('Vui lòng chọn hoặc cấu hình Network Server trước');
+    return;
+  }
+  settingDefaultAppId.value = applicationId;
+  try {
+    await request(`/servers/${targetServerId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ applicationId }),
+    });
+    cyberToast.success('Đã thiết lập Default Application ID thành công!');
+    await refreshAll();
+  } catch (err: any) {
+    cyberToast.error(err instanceof Error ? err.message : 'Không thể thiết lập Default Application');
+  } finally {
+    settingDefaultAppId.value = '';
+  }
+}
+
 async function submitServer() {
   if (
     !serverForm.name.trim() ||
     !serverForm.apiUrl.trim() ||
     !serverForm.apiToken.trim() ||
     !serverForm.tenantId.trim() ||
-    !serverForm.applicationId.trim() ||
-    !serverForm.deviceProfileId.trim()
+    !serverForm.applicationId.trim()
   ) {
-    cyberToast.warning('Vui lòng điền đủ Tên, API URL, API Token, Default Tenant ID, Default Application ID và Device Profile ID');
+    cyberToast.warning('Vui lòng điền đủ Tên, API URL, API Token, Default Tenant ID và Default Application ID');
     return;
   }
   submitting.value = true;
