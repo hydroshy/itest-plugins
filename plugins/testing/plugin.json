@@ -28,6 +28,21 @@
       "namespace": "testing",
       "resource": "device-test",
       "action": "manage"
+    },
+    {
+      "namespace": "testing",
+      "resource": "list-device-testing",
+      "action": "view"
+    },
+    {
+      "namespace": "testing",
+      "resource": "list-device-testing",
+      "action": "manage"
+    },
+    {
+      "namespace": "testing",
+      "resource": "device-test",
+      "action": "delete"
     }
   ],
   "ui": {

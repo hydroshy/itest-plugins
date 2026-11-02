@@ -7,6 +7,9 @@ import {
   DeviceSimulationProfile,
   DeviceTestSessionStatus,
   GatewayRegistrationSessionDTO,
+  DeviceTestingListItem,
+  DeviceTestingListFilter,
+  DeleteDeviceTestingDTO,
 } from './testing.types';
 
 export class TestingController {
@@ -264,6 +267,35 @@ export class TestingController {
       message: `Cập nhật trạng thái phiên test thành công: ${status}`,
       data: updated,
     };
+  }
+
+  // 7. Device Testing List & Management
+  async getDeviceTestingList(filter: DeviceTestingListFilter) {
+    const result = this.service.getDeviceTestingList(filter);
+    return {
+      success: true,
+      data: result.items,
+      meta: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+      },
+    };
+  }
+
+  async deleteDeviceTesting(dto: DeleteDeviceTestingDTO) {
+    try {
+      const result = this.service.deleteDeviceTestingItem(dto);
+      return {
+        success: result.success,
+        data: result,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Lỗi khi xóa thiết bị kiểm thử',
+      };
+    }
   }
 }
 

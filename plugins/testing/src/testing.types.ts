@@ -352,4 +352,60 @@ export interface CreateDeviceTestDTO {
   metadata?: Record<string, any>;
 }
 
+export interface DeviceTestingListItem {
+  id: string;
+  registration_code?: string;
+  serial_number: string;
+  item_code: string;
+  fw_version?: string;
+  hw_version?: string;
+  fw_code?: string;
+  me_version?: string;
+  dev_eui: string;
+  app_eui?: string;
+  app_key?: string;
+  class_mode?: string;
+  class?: string;
+  region_code?: string;
+  region?: string;
+  sensor_type?: string;
+  created_by?: string;
+  application_id?: string;
+  device_profile_id?: string;
+  network_server_id?: string;
+  network_server_name?: string;
+  network_server_url?: string;
+  connectivity?: string;
+  so_number?: string;
+  wa_number?: string;
+  status?: string;
+  message?: string;
+  error_detail?: string;
+  created_at?: Date | string;
+  updated_at?: Date | string;
+}
+
+export interface DeviceTestingListFilter {
+  userId?: string;
+  username?: string;
+  isAdmin?: boolean;
+  applicationId?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface DeleteDeviceTestingDTO {
+  id: string;
+  dev_eui?: string;
+  application_id?: string;
+  network_server_id?: string;
+  delete_from_chirpstack?: boolean;
+  user?: {
+    id?: string;
+    username?: string;
+    isAdmin?: boolean;
+  };
+}
+
 

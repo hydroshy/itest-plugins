@@ -435,6 +435,175 @@ describe('Testing Plugin Tests', () => {
       assert.strictEqual(keysPayload.deviceKeys.nwkKey, 'aabbccddeeff00112233445566778899');
     });
   });
+
+  describe('7. Device Testing List & Management (11 Fields, User/Admin isolation, Delete)', () => {
+    it('should add device testing items containing all 11 required fields', () => {
+      const dev1 = service.addDeviceTestingItem({
+        id: 'test-dev-01',
+        serial_number: 'SN-ATH-2026-001',
+        item_code: '5F0820',
+        fw_version: '1.2.0',
+        hw_version: '2.0.1',
+        fw_code: 'ATH',
+        me_version: '1.0',
+        dev_eui: '0004A30B001F0001',
+        app_eui: '0102030405060708',
+        app_key: 'AABBCCDDEEFF00112233445566778801',
+        class_mode: 'CLASS_A',
+        region_code: 'AS923-1',
+        created_by: 'tester1',
+        application_id: 'app-default-uuid',
+        status: 'SUCCESS_ATTACH_BATTERY',
+      });
+
+      assert.strictEqual(dev1.serial_number, 'SN-ATH-2026-001');
+      assert.strictEqual(dev1.item_code, '5F0820');
+      assert.strictEqual(dev1.created_by, 'tester1');
+      assert.strictEqual(dev1.application_id, 'app-default-uuid');
+
+      // Add dev2 created by tester2
+      service.addDeviceTestingItem({
+        id: 'test-dev-02',
+        serial_number: 'SN-ATH-2026-002',
+        item_code: '5F0821',
+        fw_version: '1.2.0',
+        hw_version: '2.0.1',
+        fw_code: 'ATH',
+        dev_eui: '0004A30B001F0002',
+        app_eui: '0102030405060708',
+        app_key: 'AABBCCDDEEFF00112233445566778802',
+        class_mode: 'CLASS_C',
+        region_code: 'AU915',
+        created_by: 'tester2',
+        application_id: 'app-default-uuid',
+        status: 'SUCCESS_ATTACH_BATTERY',
+      });
+
+      // Add dev3 created in another application
+      service.addDeviceTestingItem({
+        id: 'test-dev-03',
+        serial_number: 'SN-ATH-2026-003',
+        item_code: '5F0822',
+        fw_version: '1.2.0',
+        hw_version: '2.0.1',
+        fw_code: 'ATH',
+        dev_eui: '0004A30B001F0003',
+        app_eui: '0102030405060708',
+        app_key: 'AABBCCDDEEFF00112233445566778803',
+        class_mode: 'CLASS_A',
+        region_code: 'AS923-1',
+        created_by: 'tester1',
+        application_id: 'app-other-uuid',
+        status: 'SUCCESS_ATTACH_BATTERY',
+      });
+    });
+
+    it('should filter devices for regular user (user sees only devices they created in default application)', () => {
+      const result = service.getDeviceTestingList({
+        username: 'tester1',
+        isAdmin: false,
+        applicationId: 'app-default-uuid',
+      });
+
+      assert.strictEqual(result.total, 1);
+      assert.strictEqual(result.items[0].serial_number, 'SN-ATH-2026-001');
+      assert.strictEqual(result.items[0].created_by, 'tester1');
+    });
+
+    it('should allow Admin to see all devices in default application regardless of creator', () => {
+      const result = service.getDeviceTestingList({
+        username: 'admin',
+        isAdmin: true,
+        applicationId: 'app-default-uuid',
+      });
+
+      assert.strictEqual(result.total, 2);
+      const serials = result.items.map((i) => i.serial_number);
+      assert.ok(serials.includes('SN-ATH-2026-001'));
+      assert.ok(serials.includes('SN-ATH-2026-002'));
+    });
+
+    it('should support search by serial, dev_eui, item_code', () => {
+      const result = service.getDeviceTestingList({
+        isAdmin: true,
+        search: 'SN-ATH-2026-002',
+      });
+      assert.strictEqual(result.total, 1);
+      assert.strictEqual(result.items[0].serial_number, 'SN-ATH-2026-002');
+    });
+
+    it('should prevent regular user from deleting device created by another user', () => {
+      assert.throws(
+        () => {
+          service.deleteDeviceTestingItem({
+            id: 'test-dev-02', // created by tester2
+            user: {
+              username: 'tester1',
+              isAdmin: false,
+            },
+          });
+        },
+        /Bạn không có quyền xóa thiết bị do người dùng khác tạo/
+      );
+    });
+
+    it('should allow regular user to delete their own device', () => {
+      const del = service.deleteDeviceTestingItem({
+        id: 'test-dev-01',
+        user: {
+          username: 'tester1',
+          isAdmin: false,
+        },
+      });
+      assert.strictEqual(del.success, true);
+
+      // Verify it no longer appears
+      const after = service.getDeviceTestingList({
+        username: 'tester1',
+        isAdmin: false,
+        applicationId: 'app-default-uuid',
+      });
+      assert.strictEqual(after.total, 0);
+    });
+
+    it('should allow Admin to delete any device', () => {
+      const del = service.deleteDeviceTestingItem({
+        id: 'test-dev-02',
+        user: {
+          username: 'admin',
+          isAdmin: true,
+        },
+      });
+      assert.strictEqual(del.success, true);
+    });
+
+    it('should handle controller endpoints for list and delete', async () => {
+      // Re-add an item for controller testing
+      service.addDeviceTestingItem({
+        id: 'test-ctrl-01',
+        serial_number: 'SN-CTRL-001',
+        item_code: '5F0820',
+        dev_eui: '0004A30B001F0099',
+        created_by: 'tester1',
+        application_id: 'app-default-uuid',
+      });
+
+      const listRes = await controller.getDeviceTestingList({
+        username: 'tester1',
+        isAdmin: false,
+        applicationId: 'app-default-uuid',
+      });
+      assert.strictEqual(listRes.success, true);
+      assert.strictEqual(listRes.data.length, 1);
+      assert.strictEqual(listRes.data[0].serial_number, 'SN-CTRL-001');
+
+      const delRes = await controller.deleteDeviceTesting({
+        id: 'test-ctrl-01',
+        user: { username: 'tester1', isAdmin: false },
+      });
+      assert.strictEqual(delRes.success, true);
+    });
+  });
 });
 
 

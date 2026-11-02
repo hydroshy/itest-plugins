@@ -18,6 +18,9 @@ import {
   DeviceTestSession,
   DeviceTestSessionStatus,
   CreateDeviceTestDTO,
+  DeviceTestingListItem,
+  DeviceTestingListFilter,
+  DeleteDeviceTestingDTO,
 } from './testing.types';
 import { ITraceabilityProvider, DefaultTraceabilityBridge } from './testing-traceability.bridge';
 import { PacketProcessor } from './packet-processor';
@@ -793,6 +796,115 @@ export class TestingService {
     }
 
     return session;
+  }
+
+  // --- DEVICE TESTING LIST & MANAGEMENT ---
+  private deviceTestingItems: Map<string, DeviceTestingListItem> = new Map();
+
+  addDeviceTestingItem(item: DeviceTestingListItem): DeviceTestingListItem {
+    if (!item.id) {
+      item.id = `DTEST-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    }
+    if (!item.created_at) {
+      item.created_at = new Date().toISOString();
+    }
+    this.deviceTestingItems.set(item.id, item);
+    return item;
+  }
+
+  getDeviceTestingList(filter: DeviceTestingListFilter = {}): {
+    items: DeviceTestingListItem[];
+    total: number;
+    page: number;
+    limit: number;
+  } {
+    let list = Array.from(this.deviceTestingItems.values());
+
+    // 1. Filter by application_id if provided
+    if (filter.applicationId) {
+      const targetApp = filter.applicationId.trim();
+      list = list.filter((item) => (item.application_id || '').trim() === targetApp);
+    }
+
+    // 2. Filter by user: regular user sees only their own devices; Admin sees all
+    if (!filter.isAdmin) {
+      const userRef = (filter.username || filter.userId || '').trim().toLowerCase();
+      if (userRef) {
+        list = list.filter((item) => {
+          const createdBy = (item.created_by || '').trim().toLowerCase();
+          return createdBy === userRef;
+        });
+      }
+    }
+
+    // 3. Search query filter (Serial, DevEUI, Item Code, FW Code, Created By)
+    if (filter.search) {
+      const q = filter.search.trim().toLowerCase();
+      list = list.filter(
+        (item) =>
+          (item.serial_number || '').toLowerCase().includes(q) ||
+          (item.dev_eui || '').toLowerCase().includes(q) ||
+          (item.item_code || '').toLowerCase().includes(q) ||
+          (item.fw_code || '').toLowerCase().includes(q) ||
+          (item.created_by || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Sort by created_at DESC
+    list.sort((a, b) => {
+      const tA = new Date(a.created_at || 0).getTime();
+      const tB = new Date(b.created_at || 0).getTime();
+      return tB - tA;
+    });
+
+    const total = list.length;
+    const page = Math.max(1, Number(filter.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(filter.limit) || 20));
+    const offset = (page - 1) * limit;
+    const items = list.slice(offset, offset + limit);
+
+    return { items, total, page, limit };
+  }
+
+  deleteDeviceTestingItem(
+    dto: DeleteDeviceTestingDTO
+  ): { success: boolean; id: string; message: string } {
+    let targetId = dto.id;
+    let existing = this.deviceTestingItems.get(targetId);
+
+    if (!existing && dto.dev_eui) {
+      for (const [id, item] of this.deviceTestingItems.entries()) {
+        if ((item.dev_eui || '').toLowerCase() === dto.dev_eui.toLowerCase()) {
+          existing = item;
+          targetId = id;
+          break;
+        }
+      }
+    }
+
+    if (!existing) {
+      return {
+        success: false,
+        id: dto.id,
+        message: `Không tìm thấy thiết bị kiểm thử với ID hoặc DevEUI '${dto.id || dto.dev_eui}'`,
+      };
+    }
+
+    // Role check: non-admin can only delete their own device
+    if (dto.user && !dto.user.isAdmin) {
+      const userRef = (dto.user.username || dto.user.id || '').trim().toLowerCase();
+      const createdBy = (existing.created_by || '').trim().toLowerCase();
+      if (userRef && createdBy && userRef !== createdBy) {
+        throw new Error('Bạn không có quyền xóa thiết bị do người dùng khác tạo');
+      }
+    }
+
+    this.deviceTestingItems.delete(targetId);
+    return {
+      success: true,
+      id: targetId,
+      message: `Đã xóa thiết bị kiểm thử ${existing.serial_number || existing.dev_eui} thành công`,
+    };
   }
 }
 
