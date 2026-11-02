@@ -433,6 +433,9 @@ export class ChirpStackApiClient {
           macVersion: dp.macVersion || 'LORAWAN_1_0_3',
           regParamsRevision: dp.regParamsRevision || 'RP002_1_0_3',
           tenantId: dp.tenantId || server.tenantId,
+          supportsClassB: dp.supportsClassB,
+          supportsClassC: dp.supportsClassC,
+          supportsOtaa: dp.supportsOtaa,
         }));
       }
     } catch {

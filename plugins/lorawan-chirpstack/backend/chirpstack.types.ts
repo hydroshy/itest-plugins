@@ -70,6 +70,9 @@ export interface ChirpStackDeviceProfile {
   macVersion: string;
   regParamsRevision: string;
   tenantId: string;
+  supportsClassB?: boolean;
+  supportsClassC?: boolean;
+  supportsOtaa?: boolean;
 }
 
 export interface LoRaWanUplinkEvent {
