@@ -5,6 +5,8 @@ export interface ChirpStackNetworkServer {
   apiToken: string;
   /** Optional when registering the ChirpStack server; tenants are managed separately. */
   tenantId?: string;
+  applicationId?: string;
+  deviceProfileId?: string;
   version: string;
   status: 'online' | 'offline' | 'untested';
   lastCheckedAt?: string;
@@ -114,6 +116,17 @@ export interface CreateNetworkServerDto {
   apiToken: string;
   /** Tenant selection belongs to TenantService and is optional for server registration. */
   tenantId?: string;
+  applicationId?: string;
+  deviceProfileId?: string;
+}
+
+export interface UpdateNetworkServerDto {
+  name?: string;
+  apiUrl?: string;
+  apiToken?: string;
+  tenantId?: string;
+  applicationId?: string;
+  deviceProfileId?: string;
 }
 
 export interface CreateGatewayDto {

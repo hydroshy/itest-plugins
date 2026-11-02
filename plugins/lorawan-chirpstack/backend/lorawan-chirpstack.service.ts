@@ -7,6 +7,7 @@ import {
   ChirpStackTenant,
   LoRaWanUplinkEvent,
   CreateNetworkServerDto,
+  UpdateNetworkServerDto,
   CreateGatewayDto,
   CreateDeviceDto,
   CreateTenantDto,
@@ -36,6 +37,8 @@ export class LoRaWanChirpStackService {
       apiUrl: 'http://localhost:8080',
       apiToken: 'cs_token_sample_abc123',
       tenantId: '52f14fb4-c5a1-4566-9b57-69502b78a9c1',
+      applicationId: 'app-iot-monitoring',
+      deviceProfileId: 'dp-as923-otaa',
       version: 'v4.7.0',
       status: 'online',
       lastCheckedAt: new Date().toISOString(),
@@ -160,6 +163,8 @@ export class LoRaWanChirpStackService {
       apiUrl: requireString('apiUrl', dto?.apiUrl),
       apiToken: requireString('apiToken', dto?.apiToken),
       tenantId: typeof dto?.tenantId === 'string' ? dto.tenantId.trim() : '',
+      applicationId: typeof dto?.applicationId === 'string' ? dto.applicationId.trim() : '',
+      deviceProfileId: typeof dto?.deviceProfileId === 'string' ? dto.deviceProfileId.trim() : '',
       version: 'ChirpStack v4',
       status: 'untested',
       lastCheckedAt: new Date().toISOString(),
@@ -178,6 +183,20 @@ export class LoRaWanChirpStackService {
 
   async deleteNetworkServer(id: string): Promise<boolean> {
     return this.servers.delete(id);
+  }
+
+  async updateNetworkServer(id: string, dto: UpdateNetworkServerDto): Promise<ChirpStackNetworkServer> {
+    const server = this.servers.get(id);
+    if (!server) {
+      throw new Error(`Không tìm thấy Network Server ID "${id}"`);
+    }
+    if (dto.name !== undefined) server.name = String(dto.name).trim();
+    if (dto.apiUrl !== undefined) server.apiUrl = String(dto.apiUrl).trim();
+    if (dto.apiToken !== undefined) server.apiToken = String(dto.apiToken).trim();
+    if (dto.tenantId !== undefined) server.tenantId = String(dto.tenantId).trim();
+    if (dto.applicationId !== undefined) server.applicationId = String(dto.applicationId).trim();
+    if (dto.deviceProfileId !== undefined) server.deviceProfileId = String(dto.deviceProfileId).trim();
+    return server;
   }
 
   async testServerConnection(id: string): Promise<{ success: boolean; message: string; version?: string }> {

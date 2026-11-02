@@ -1,6 +1,7 @@
 import { LoRaWanChirpStackService } from './lorawan-chirpstack.service';
 import {
   CreateNetworkServerDto,
+  UpdateNetworkServerDto,
   CreateGatewayDto,
   CreateDeviceDto,
   DecodePayloadDto,
@@ -28,6 +29,10 @@ export class LoRaWanChirpStackController {
 
   async addServer(dto: CreateNetworkServerDto) {
     return this.service.addNetworkServer(dto);
+  }
+
+  async updateServer(id: string, dto: UpdateNetworkServerDto) {
+    return this.service.updateNetworkServer(id, dto);
   }
 
   async deleteServer(id: string) {
