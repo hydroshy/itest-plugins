@@ -334,6 +334,12 @@ export interface CreateDeviceTestDTO {
   network_id?: string;
   networkId?: string;
   connectivity?: 'LoRaWAN' | 'Sigfox' | string;
+  network_server_id?: string;
+  networkServerId?: string;
+  application_id?: string;
+  applicationId?: string;
+  device_profile_id?: string;
+  deviceProfileId?: string;
   item_code?: string;
   itemCode?: string;
   sku?: string;
