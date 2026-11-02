@@ -408,4 +408,144 @@ export interface DeleteDeviceTestingDTO {
   };
 }
 
+// --- TEST BATCH TYPES ---
+
+export type TestBatchStatus = 'DRAFT' | 'READY' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+
+export interface TestBatch {
+  id: string;
+  batch_code: string;
+  name: string;
+  item_code: string;
+  fw_version: string; // Long FW version / LONG_FW
+  long_fw?: string;
+  simulation_flow_id: string;
+  simulation_flow_name?: string;
+  simulation_duration_seconds?: number;
+  autocheck_criteria_id?: string;
+  autocheck_criteria_name?: string;
+  max_devices: number;
+  description?: string;
+  created_by?: string;
+  status: TestBatchStatus;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+export interface CreateTestBatchDTO {
+  batch_code?: string;
+  batchCode?: string;
+  name: string;
+  item_code: string;
+  itemCode?: string;
+  fw_version: string;
+  fwVersion?: string;
+  long_fw?: string;
+  longFw?: string;
+  simulation_flow_id: string;
+  simulationFlowId?: string;
+  simulation_flow_name?: string;
+  simulationFlowName?: string;
+  simulation_duration_seconds?: number;
+  simulationDurationSeconds?: number;
+  autocheck_criteria_id?: string;
+  autocheckCriteriaId?: string;
+  autocheck_criteria_name?: string;
+  autocheckCriteriaName?: string;
+  max_devices: number;
+  maxDevices?: number;
+  description?: string;
+  created_by?: string;
+  createdBy?: string;
+}
+
+export interface ReferenceDeviceItem {
+  id: string;
+  serial_number: string;
+  dev_eui: string;
+  item_code: string;
+  fw_version?: string;
+  name?: string;
+  description?: string;
+  status?: 'ACTIVE' | 'CALIBRATED' | 'STANDBY';
+  baseline_metrics?: {
+    rssi?: number;
+    snr?: number;
+    payload_sample?: string;
+    decoded_sample?: Record<string, any>;
+  };
+}
+
+export interface TestBatchDeviceMappingItem {
+  test_device_id: string;
+  test_device_serial?: string;
+  test_device_eui?: string;
+  reference_device_id: string;
+  reference_device_serial?: string;
+  reference_device_eui?: string;
+}
+
+export interface StartTestBatchExecutionDTO {
+  batch_id: string;
+  batchId?: string;
+  device_mappings?: TestBatchDeviceMappingItem[];
+  deviceMappings?: TestBatchDeviceMappingItem[];
+  simulation_flow_id?: string;
+  simulationFlowId?: string;
+  duration_seconds?: number;
+  timeout_seconds?: number;
+  started_by?: string;
+}
+
+export interface TestBatchDeviceResult {
+  test_device_id: string;
+  test_device_serial: string;
+  test_device_eui: string;
+  reference_device_id: string;
+  reference_device_serial: string;
+  reference_device_eui: string;
+  status: 'PENDING' | 'TESTING' | 'PASSED' | 'FAILED';
+  score?: number;
+  auto_check_passed?: boolean;
+  comparison_metrics?: {
+    rssi_diff?: number;
+    snr_diff?: number;
+    payload_match?: boolean;
+    packet_loss_rate?: number;
+  };
+  log?: string[];
+  message?: string;
+}
+
+export interface TestBatchExecution {
+  execution_id: string;
+  batch_id: string;
+  batch_name?: string;
+  item_code: string;
+  fw_version: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  current_step?: string;
+  elapsed_seconds: number;
+  total_duration_seconds: number;
+  remaining_seconds: number;
+  total_devices: number;
+  passed_devices: number;
+  failed_devices: number;
+  devices: TestBatchDeviceResult[];
+  started_at: Date | string;
+  completed_at?: Date | string;
+}
+
+export interface AvailableDevicesForBatchFilter {
+  item_code: string;
+  itemCode?: string;
+  fw_version?: string;
+  fwVersion?: string;
+  long_fw?: string;
+  longFw?: string;
+  search?: string;
+  limit?: number;
+}
+
+
 

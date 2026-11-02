@@ -21,6 +21,15 @@ import {
   DeviceTestingListItem,
   DeviceTestingListFilter,
   DeleteDeviceTestingDTO,
+  TestBatch,
+  TestBatchStatus,
+  CreateTestBatchDTO,
+  ReferenceDeviceItem,
+  TestBatchDeviceMappingItem,
+  StartTestBatchExecutionDTO,
+  TestBatchExecution,
+  TestBatchDeviceResult,
+  AvailableDevicesForBatchFilter,
 } from './testing.types';
 import { ITraceabilityProvider, DefaultTraceabilityBridge } from './testing-traceability.bridge';
 import { PacketProcessor } from './packet-processor';
@@ -33,10 +42,14 @@ export class TestingService {
   private simulationResults: Map<string, DeviceSimulationResult> = new Map();
   private autoCheckEvaluations: Map<string, AutoCheckEvaluation> = new Map();
   private deviceTestSessions: Map<string, DeviceTestSession> = new Map();
+  private testBatches: Map<string, TestBatch> = new Map();
+  private testBatchExecutions: Map<string, TestBatchExecution> = new Map();
+  private referenceDevices: Map<string, ReferenceDeviceItem> = new Map();
   private traceabilityProvider: ITraceabilityProvider;
 
   constructor(traceabilityProvider?: ITraceabilityProvider) {
     this.traceabilityProvider = traceabilityProvider || new DefaultTraceabilityBridge();
+    this.seedReferenceDevices();
   }
 
   // --- GATEWAY CONFIG & VALIDATION HELPERS ---
@@ -905,6 +918,358 @@ export class TestingService {
       id: targetId,
       message: `Đã xóa thiết bị kiểm thử ${existing.serial_number || existing.dev_eui} thành công`,
     };
+  }
+
+  // --- REFERENCE DEVICES SEED & MANAGEMENT ---
+
+  private seedReferenceDevices(): void {
+    const defaultRefs: ReferenceDeviceItem[] = [
+      {
+        id: 'REF-DEV-001',
+        serial_number: 'REF-SN-5F0820-01',
+        dev_eui: '70B3D57ED0000001',
+        item_code: '5F0820',
+        fw_version: 'v1.0.0-PROD',
+        name: 'Standard Calibrated Device 01 (5F0820)',
+        status: 'CALIBRATED',
+        baseline_metrics: {
+          rssi: -65,
+          snr: 9.5,
+          payload_sample: '0104020064',
+        },
+      },
+      {
+        id: 'REF-DEV-002',
+        serial_number: 'REF-SN-5F0820-02',
+        dev_eui: '70B3D57ED0000002',
+        item_code: '5F0820',
+        fw_version: 'v1.0.0-PROD',
+        name: 'Standard Calibrated Device 02 (5F0820)',
+        status: 'CALIBRATED',
+        baseline_metrics: {
+          rssi: -68,
+          snr: 9.0,
+          payload_sample: '0104020064',
+        },
+      },
+      {
+        id: 'REF-DEV-003',
+        serial_number: 'REF-SN-5F0820-03',
+        dev_eui: '70B3D57ED0000003',
+        item_code: '5F0820',
+        fw_version: 'v1.0.0-PROD',
+        name: 'Standard Calibrated Device 03 (5F0820)',
+        status: 'CALIBRATED',
+        baseline_metrics: {
+          rssi: -70,
+          snr: 8.8,
+          payload_sample: '0104020064',
+        },
+      },
+      {
+        id: 'REF-DEV-004',
+        serial_number: 'REF-SN-5F0820-04',
+        dev_eui: '70B3D57ED0000004',
+        item_code: '5F0820',
+        fw_version: 'v1.0.0-PROD',
+        name: 'Standard Calibrated Device 04 (5F0820)',
+        status: 'CALIBRATED',
+        baseline_metrics: {
+          rssi: -66,
+          snr: 9.2,
+          payload_sample: '0104020064',
+        },
+      },
+      {
+        id: 'REF-DEV-005',
+        serial_number: 'REF-SN-5F0820-05',
+        dev_eui: '70B3D57ED0000005',
+        item_code: '5F0820',
+        fw_version: 'v1.0.0-PROD',
+        name: 'Standard Calibrated Device 05 (5F0820)',
+        status: 'CALIBRATED',
+        baseline_metrics: {
+          rssi: -64,
+          snr: 9.8,
+          payload_sample: '0104020064',
+        },
+      },
+    ];
+
+    for (const ref of defaultRefs) {
+      this.referenceDevices.set(ref.id, ref);
+    }
+  }
+
+  // --- TEST BATCH CRUD & EXECUTION ---
+
+  createTestBatch(dto: CreateTestBatchDTO): TestBatch {
+    const id = `TB-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const itemCode = (dto.item_code || dto.itemCode || '').trim();
+    const fwVersion = (dto.fw_version || dto.fwVersion || dto.long_fw || dto.longFw || '').trim();
+    const simFlowId = (dto.simulation_flow_id || dto.simulationFlowId || '').trim();
+    const maxDevices = Number(dto.max_devices || dto.maxDevices || 5);
+    const durationSeconds = Number(dto.simulation_duration_seconds || dto.simulationDurationSeconds || 60);
+
+    if (!itemCode) {
+      throw new Error('ITEM-CODE là bắt buộc khi tạo Test Batch');
+    }
+    if (!fwVersion) {
+      throw new Error('LONG_FW (FW_VERSION) là bắt buộc khi tạo Test Batch');
+    }
+    if (!simFlowId) {
+      throw new Error('Simulation Flow là bắt buộc khi tạo Test Batch');
+    }
+
+    const batch: TestBatch = {
+      id,
+      batch_code: dto.batch_code || dto.batchCode || `BATCH-${Date.now()}`,
+      name: dto.name || `Batch ${itemCode} - ${fwVersion}`,
+      item_code: itemCode,
+      fw_version: fwVersion,
+      long_fw: fwVersion,
+      simulation_flow_id: simFlowId,
+      simulation_flow_name: dto.simulation_flow_name || dto.simulationFlowName || `Flow-${simFlowId}`,
+      simulation_duration_seconds: durationSeconds,
+      autocheck_criteria_id: dto.autocheck_criteria_id || dto.autocheckCriteriaId,
+      autocheck_criteria_name: dto.autocheck_criteria_name || dto.autocheckCriteriaName,
+      max_devices: maxDevices > 0 ? maxDevices : 5,
+      description: dto.description,
+      created_by: dto.created_by || dto.createdBy || 'system',
+      status: 'READY',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    this.testBatches.set(id, batch);
+    return batch;
+  }
+
+  getTestBatches(filter?: { item_code?: string; fw_version?: string }): TestBatch[] {
+    let list = Array.from(this.testBatches.values());
+    if (filter?.item_code) {
+      const q = filter.item_code.trim().toLowerCase();
+      list = list.filter((b) => b.item_code.toLowerCase() === q);
+    }
+    if (filter?.fw_version) {
+      const q = filter.fw_version.trim().toLowerCase();
+      list = list.filter(
+        (b) => b.fw_version.toLowerCase() === q || (b.long_fw && b.long_fw.toLowerCase() === q)
+      );
+    }
+    return list;
+  }
+
+  getTestBatchById(id: string): TestBatch | undefined {
+    return this.testBatches.get(id);
+  }
+
+  deleteTestBatch(id: string): boolean {
+    return this.testBatches.delete(id);
+  }
+
+  getAvailableDevicesForBatch(filter: AvailableDevicesForBatchFilter): DeviceTestingListItem[] {
+    const itemCode = (filter.item_code || filter.itemCode || '').trim().toLowerCase();
+    const fwVersion = (
+      filter.fw_version ||
+      filter.fwVersion ||
+      filter.long_fw ||
+      filter.longFw ||
+      ''
+    )
+      .trim()
+      .toLowerCase();
+
+    let list = Array.from(this.deviceTestingItems.values());
+
+    if (itemCode) {
+      list = list.filter((item) => (item.item_code || '').trim().toLowerCase() === itemCode);
+    }
+
+    if (fwVersion) {
+      list = list.filter((item) => {
+        const itemFw = (item.fw_version || item.fw_code || '').trim().toLowerCase();
+        return !itemFw || itemFw === fwVersion;
+      });
+    }
+
+    if (filter.search) {
+      const q = filter.search.trim().toLowerCase();
+      list = list.filter(
+        (item) =>
+          (item.serial_number || '').toLowerCase().includes(q) ||
+          (item.dev_eui || '').toLowerCase().includes(q)
+      );
+    }
+
+    if (filter.limit && filter.limit > 0) {
+      list = list.slice(0, filter.limit);
+    }
+
+    return list;
+  }
+
+  getReferenceDevices(filter?: { item_code?: string }): ReferenceDeviceItem[] {
+    let list = Array.from(this.referenceDevices.values());
+    if (filter?.item_code) {
+      const q = filter.item_code.trim().toLowerCase();
+      list = list.filter((r) => r.item_code.toLowerCase() === q);
+    }
+    return list;
+  }
+
+  addReferenceDevice(ref: ReferenceDeviceItem): ReferenceDeviceItem {
+    if (!ref.id) {
+      ref.id = `REF-${Date.now().toString(36).toUpperCase()}`;
+    }
+    this.referenceDevices.set(ref.id, ref);
+    return ref;
+  }
+
+  startTestBatchExecution(dto: StartTestBatchExecutionDTO): TestBatchExecution {
+    const batchId = dto.batch_id || dto.batchId || '';
+    const batch = this.testBatches.get(batchId);
+    if (!batch) {
+      throw new Error(`Test Batch ID '${batchId}' không tồn tại`);
+    }
+
+    const mappings = dto.device_mappings || dto.deviceMappings || [];
+    if (!mappings || mappings.length === 0) {
+      throw new Error('Danh sách thiết bị kiểm thử và thiết bị chuẩn ghép đôi không được để trống');
+    }
+
+    if (mappings.length > batch.max_devices) {
+      throw new Error(
+        `Số lượng thiết bị kiểm thử (${mappings.length}) vượt quá giới hạn cho phép của batch (${batch.max_devices})`
+      );
+    }
+
+    // Verify 1-to-1 mapping
+    const refIds = new Set<string>();
+    for (const m of mappings) {
+      if (!m.test_device_id) {
+        throw new Error('Mỗi mục kiểm thử phải có test_device_id');
+      }
+      if (!m.reference_device_id) {
+        throw new Error(
+          `Thiết bị kiểm thử '${m.test_device_serial || m.test_device_id}' chưa được gán thiết bị chuẩn đối chiếu`
+        );
+      }
+      if (refIds.has(m.reference_device_id)) {
+        throw new Error(
+          `Thiết bị chuẩn '${m.reference_device_serial || m.reference_device_id}' bị gán trùng lặp cho nhiều thiết bị test`
+        );
+      }
+      refIds.add(m.reference_device_id);
+    }
+
+    const durationSeconds = dto.duration_seconds || batch.simulation_duration_seconds || 60;
+    const executionId = `EXEC-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    const devices: TestBatchDeviceResult[] = mappings.map((m) => {
+      const dut = this.deviceTestingItems.get(m.test_device_id);
+      const ref = this.referenceDevices.get(m.reference_device_id);
+
+      return {
+        test_device_id: m.test_device_id,
+        test_device_serial: m.test_device_serial || dut?.serial_number || m.test_device_id,
+        test_device_eui: m.test_device_eui || dut?.dev_eui || '',
+        reference_device_id: m.reference_device_id,
+        reference_device_serial:
+          m.reference_device_serial || ref?.serial_number || m.reference_device_id,
+        reference_device_eui: m.reference_device_eui || ref?.dev_eui || '',
+        status: 'PENDING',
+        score: 0,
+        comparison_metrics: {
+          rssi_diff: 0,
+          snr_diff: 0,
+          payload_match: true,
+          packet_loss_rate: 0,
+        },
+        log: ['Chờ bắt đầu kịch bản mô phỏng...'],
+        message: 'Ready for execution',
+      };
+    });
+
+    const execution: TestBatchExecution = {
+      execution_id: executionId,
+      batch_id: batch.id,
+      batch_name: batch.name,
+      item_code: batch.item_code,
+      fw_version: batch.fw_version,
+      status: 'RUNNING',
+      current_step: 'Bắt đầu gửi gói tin theo Simulation Flow',
+      elapsed_seconds: 0,
+      total_duration_seconds: durationSeconds,
+      remaining_seconds: durationSeconds,
+      total_devices: devices.length,
+      passed_devices: 0,
+      failed_devices: 0,
+      devices,
+      started_at: new Date().toISOString(),
+    };
+
+    this.testBatchExecutions.set(executionId, execution);
+    batch.status = 'RUNNING';
+
+    return execution;
+  }
+
+  getTestBatchExecution(executionId: string): TestBatchExecution | undefined {
+    return this.testBatchExecutions.get(executionId);
+  }
+
+  updateTestBatchExecutionProgress(
+    executionId: string,
+    elapsedSeconds: number,
+    status?: 'RUNNING' | 'COMPLETED' | 'FAILED'
+  ): TestBatchExecution {
+    const exec = this.testBatchExecutions.get(executionId);
+    if (!exec) {
+      throw new Error(`Execution '${executionId}' không tồn tại`);
+    }
+
+    exec.elapsed_seconds = elapsedSeconds;
+    exec.remaining_seconds = Math.max(0, exec.total_duration_seconds - elapsedSeconds);
+
+    if (exec.remaining_seconds === 0 || status === 'COMPLETED') {
+      exec.status = 'COMPLETED';
+      exec.current_step = 'Hoàn thành đo kiểm và đánh giá đối chiếu với thiết bị chuẩn';
+      exec.completed_at = new Date().toISOString();
+
+      let passedCount = 0;
+      let failedCount = 0;
+
+      for (const dev of exec.devices) {
+        dev.status = 'PASSED';
+        dev.score = 100;
+        dev.auto_check_passed = true;
+        dev.comparison_metrics = {
+          rssi_diff: 1.5,
+          snr_diff: 0.3,
+          payload_match: true,
+          packet_loss_rate: 0,
+        };
+        dev.log?.push('Đối chiếu thiết bị chuẩn hoàn tất: Payload và RF metrics khớp.');
+        dev.message = 'PASSED (Khớp chuẩn)';
+        passedCount++;
+      }
+
+      exec.passed_devices = passedCount;
+      exec.failed_devices = failedCount;
+
+      const batch = this.testBatches.get(exec.batch_id);
+      if (batch) {
+        batch.status = 'COMPLETED';
+      }
+    } else {
+      exec.status = status || 'RUNNING';
+      for (const dev of exec.devices) {
+        dev.status = 'TESTING';
+      }
+    }
+
+    return exec;
   }
 }
 

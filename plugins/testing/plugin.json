@@ -43,6 +43,31 @@
       "namespace": "testing",
       "resource": "device-test",
       "action": "delete"
+    },
+    {
+      "namespace": "testing",
+      "resource": "test-batch",
+      "action": "view"
+    },
+    {
+      "namespace": "testing",
+      "resource": "test-batch",
+      "action": "manage"
+    },
+    {
+      "namespace": "testing",
+      "resource": "test-batch",
+      "action": "execute"
+    },
+    {
+      "namespace": "testing",
+      "resource": "create-test-batch",
+      "action": "view"
+    },
+    {
+      "namespace": "testing",
+      "resource": "create-test-batch",
+      "action": "manage"
     }
   ],
   "ui": {

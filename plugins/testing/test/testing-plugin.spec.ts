@@ -523,5 +523,205 @@ describe('Testing Plugin Tests', () => {
       assert.strictEqual(del.success, true);
     });
   });
+
+  describe('8. Test Batch & Create Test Batch Workflow', () => {
+    let createdBatchId = '';
+
+    it('should create a Test Batch with ITEM-CODE, LONG_FW, Simulation Flow and AutoCheck criteria', () => {
+      const batch = service.createTestBatch({
+        name: 'Batch Testing 5F0820 Flow A',
+        item_code: '5F0820',
+        fw_version: 'v1.0.0-PROD',
+        simulation_flow_id: 'flow-sim-01',
+        simulation_flow_name: 'Flow AS923 Uplink 60s',
+        simulation_duration_seconds: 60,
+        autocheck_criteria_id: 'rule-autocheck-01',
+        max_devices: 5,
+        description: 'Batch kiểm thử 5 thiết bị đồng thời',
+      });
+
+      assert.ok(batch.id);
+      assert.strictEqual(batch.item_code, '5F0820');
+      assert.strictEqual(batch.fw_version, 'v1.0.0-PROD');
+      assert.strictEqual(batch.max_devices, 5);
+      assert.strictEqual(batch.status, 'READY');
+      createdBatchId = batch.id;
+    });
+
+    it('should reject creating Test Batch when required fields are missing', () => {
+      assert.throws(
+        () =>
+          service.createTestBatch({
+            name: 'Invalid',
+            item_code: '',
+            fw_version: 'v1.0',
+            simulation_flow_id: 'f1',
+            max_devices: 5,
+          }),
+        /ITEM-CODE là bắt buộc/
+      );
+      assert.throws(
+        () =>
+          service.createTestBatch({
+            name: 'Invalid',
+            item_code: '5F0820',
+            fw_version: '',
+            simulation_flow_id: 'f1',
+            max_devices: 5,
+          }),
+        /LONG_FW \(FW_VERSION\) là bắt buộc/
+      );
+      assert.throws(
+        () =>
+          service.createTestBatch({
+            name: 'Invalid',
+            item_code: '5F0820',
+            fw_version: 'v1.0',
+            simulation_flow_id: '',
+            max_devices: 5,
+          }),
+        /Simulation Flow là bắt buộc/
+      );
+    });
+
+    it('should retrieve seeded reference devices for pairing', () => {
+      const refs = service.getReferenceDevices({ item_code: '5F0820' });
+      assert.strictEqual(refs.length >= 5, true);
+      assert.strictEqual(refs[0].status, 'CALIBRATED');
+      assert.ok(refs[0].baseline_metrics);
+    });
+
+    it('should filter available devices by matching item_code and fw_version', () => {
+      service.addDeviceTestingItem({
+        id: 'dev-batch-01',
+        serial_number: 'SN-BATCH-01',
+        item_code: '5F0820',
+        fw_version: 'v1.0.0-PROD',
+        dev_eui: '70B3D57ED0001001',
+      });
+      service.addDeviceTestingItem({
+        id: 'dev-batch-02',
+        serial_number: 'SN-BATCH-02',
+        item_code: '5F0820',
+        fw_version: 'v1.0.0-PROD',
+        dev_eui: '70B3D57ED0001002',
+      });
+      service.addDeviceTestingItem({
+        id: 'dev-other-01',
+        serial_number: 'SN-OTHER-01',
+        item_code: 'DIFFERENT_ITEM',
+        fw_version: 'v1.0.0-PROD',
+        dev_eui: '70B3D57ED0001099',
+      });
+
+      const matched = service.getAvailableDevicesForBatch({
+        item_code: '5F0820',
+        fw_version: 'v1.0.0-PROD',
+      });
+      assert.strictEqual(
+        matched.some((d) => d.id === 'dev-batch-01'),
+        true
+      );
+      assert.strictEqual(
+        matched.some((d) => d.id === 'dev-batch-02'),
+        true
+      );
+      assert.strictEqual(
+        matched.some((d) => d.id === 'dev-other-01'),
+        false
+      );
+    });
+
+    it('should start test batch execution with 1-to-1 reference device pairing', () => {
+      const refs = service.getReferenceDevices({ item_code: '5F0820' });
+      const exec = service.startTestBatchExecution({
+        batch_id: createdBatchId,
+        device_mappings: [
+          {
+            test_device_id: 'dev-batch-01',
+            test_device_serial: 'SN-BATCH-01',
+            reference_device_id: refs[0].id,
+            reference_device_serial: refs[0].serial_number,
+          },
+          {
+            test_device_id: 'dev-batch-02',
+            test_device_serial: 'SN-BATCH-02',
+            reference_device_id: refs[1].id,
+            reference_device_serial: refs[1].serial_number,
+          },
+        ],
+      });
+
+      assert.strictEqual(exec.status, 'RUNNING');
+      assert.strictEqual(exec.total_devices, 2);
+      assert.strictEqual(exec.remaining_seconds, 60);
+      assert.strictEqual(exec.devices[0].reference_device_id, refs[0].id);
+      assert.strictEqual(exec.devices[1].reference_device_id, refs[1].id);
+    });
+
+    it('should reject execution when assigning the same reference device to multiple test devices', () => {
+      const refs = service.getReferenceDevices({ item_code: '5F0820' });
+      assert.throws(
+        () =>
+          service.startTestBatchExecution({
+            batch_id: createdBatchId,
+            device_mappings: [
+              { test_device_id: 'dev-batch-01', reference_device_id: refs[0].id },
+              { test_device_id: 'dev-batch-02', reference_device_id: refs[0].id },
+            ],
+          }),
+        /bị gán trùng lặp cho nhiều thiết bị test/
+      );
+    });
+
+    it('should reject execution when exceeding batch max_devices limit', () => {
+      assert.throws(
+        () =>
+          service.startTestBatchExecution({
+            batch_id: createdBatchId,
+            device_mappings: [
+              { test_device_id: 'd1', reference_device_id: 'r1' },
+              { test_device_id: 'd2', reference_device_id: 'r2' },
+              { test_device_id: 'd3', reference_device_id: 'r3' },
+              { test_device_id: 'd4', reference_device_id: 'r4' },
+              { test_device_id: 'd5', reference_device_id: 'r5' },
+              { test_device_id: 'd6', reference_device_id: 'r6' },
+            ],
+          }),
+        /vượt quá giới hạn cho phép của batch/
+      );
+    });
+
+    it('should update countdown progress and complete execution with auto check against reference device', () => {
+      const batches = service.getTestBatches();
+      const batch = batches[0];
+      const refs = service.getReferenceDevices();
+      const exec = service.startTestBatchExecution({
+        batch_id: batch.id,
+        duration_seconds: 30,
+        device_mappings: [
+          { test_device_id: 'dev-batch-01', reference_device_id: refs[0].id },
+        ],
+      });
+
+      // Advance timer halfway
+      const runningExec = service.updateTestBatchExecutionProgress(
+        exec.execution_id,
+        15,
+        'RUNNING'
+      );
+      assert.strictEqual(runningExec.status, 'RUNNING');
+      assert.strictEqual(runningExec.elapsed_seconds, 15);
+      assert.strictEqual(runningExec.remaining_seconds, 15);
+
+      // Finish timer
+      const completedExec = service.updateTestBatchExecutionProgress(exec.execution_id, 30);
+      assert.strictEqual(completedExec.status, 'COMPLETED');
+      assert.strictEqual(completedExec.remaining_seconds, 0);
+      assert.strictEqual(completedExec.passed_devices, 1);
+      assert.strictEqual(completedExec.devices[0].status, 'PASSED');
+      assert.strictEqual(completedExec.devices[0].auto_check_passed, true);
+    });
+  });
 });
 

@@ -10,6 +10,9 @@ import {
   DeviceTestingListItem,
   DeviceTestingListFilter,
   DeleteDeviceTestingDTO,
+  CreateTestBatchDTO,
+  StartTestBatchExecutionDTO,
+  AvailableDevicesForBatchFilter,
 } from './testing.types';
 
 export class TestingController {
@@ -294,6 +297,125 @@ export class TestingController {
       return {
         success: false,
         message: error.message || 'Lỗi khi xóa thiết bị kiểm thử',
+      };
+    }
+  }
+
+  // 8. Test Batch & Device Test Batch Management
+  async createTestBatch(dto: CreateTestBatchDTO) {
+    try {
+      const batch = this.service.createTestBatch(dto);
+      return {
+        success: true,
+        message: 'Tạo Test Batch thành công',
+        data: batch,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Lỗi khi tạo Test Batch',
+      };
+    }
+  }
+
+  async listTestBatches(filter?: { item_code?: string; fw_version?: string }) {
+    const list = this.service.getTestBatches(filter);
+    return {
+      success: true,
+      data: list,
+      total: list.length,
+    };
+  }
+
+  async getTestBatch(id: string) {
+    const batch = this.service.getTestBatchById(id);
+    if (!batch) {
+      return {
+        success: false,
+        message: `Không tìm thấy Test Batch với ID '${id}'`,
+      };
+    }
+    return {
+      success: true,
+      data: batch,
+    };
+  }
+
+  async deleteTestBatch(id: string) {
+    const deleted = this.service.deleteTestBatch(id);
+    return {
+      success: deleted,
+      message: deleted ? 'Đã xóa Test Batch' : 'Không tìm thấy Test Batch để xóa',
+    };
+  }
+
+  async getAvailableDevicesForBatch(filter: AvailableDevicesForBatchFilter) {
+    const items = this.service.getAvailableDevicesForBatch(filter);
+    return {
+      success: true,
+      data: items,
+      total: items.length,
+    };
+  }
+
+  async getReferenceDevices(filter?: { item_code?: string }) {
+    const refs = this.service.getReferenceDevices(filter);
+    return {
+      success: true,
+      data: refs,
+      total: refs.length,
+    };
+  }
+
+  async startTestBatchExecution(dto: StartTestBatchExecutionDTO) {
+    try {
+      const exec = this.service.startTestBatchExecution(dto);
+      return {
+        success: true,
+        message: 'Bắt đầu chạy Test Batch thành công',
+        data: exec,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Lỗi khi khởi chạy Test Batch',
+      };
+    }
+  }
+
+  async getTestBatchExecution(executionId: string) {
+    const exec = this.service.getTestBatchExecution(executionId);
+    if (!exec) {
+      return {
+        success: false,
+        message: `Không tìm thấy Execution với ID '${executionId}'`,
+      };
+    }
+    return {
+      success: true,
+      data: exec,
+    };
+  }
+
+  async updateTestBatchExecutionProgress(
+    executionId: string,
+    elapsedSeconds: number,
+    status?: 'RUNNING' | 'COMPLETED' | 'FAILED'
+  ) {
+    try {
+      const updated = this.service.updateTestBatchExecutionProgress(
+        executionId,
+        elapsedSeconds,
+        status
+      );
+      return {
+        success: true,
+        data: updated,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Lỗi cập nhật tiến độ Test Batch',
       };
     }
   }
