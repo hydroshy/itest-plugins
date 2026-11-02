@@ -741,7 +741,12 @@ export class TestingService {
       status: 'IDLE',
       verdict: 'PENDING',
       total_packets_sent: 0,
-      metadata: dto.metadata || {},
+      metadata: {
+        ...(dto.metadata || {}),
+        ...(dto.network_server_id || dto.networkServerId ? { network_server_id: dto.network_server_id || dto.networkServerId } : {}),
+        ...(dto.application_id || dto.applicationId ? { application_id: dto.application_id || dto.applicationId } : {}),
+        ...(dto.device_profile_id || dto.deviceProfileId ? { device_profile_id: dto.device_profile_id || dto.deviceProfileId } : {}),
+      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
