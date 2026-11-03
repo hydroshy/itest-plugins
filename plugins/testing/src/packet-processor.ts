@@ -1,4 +1,10 @@
-import { DevicePacketDTO, PacketDirection, PacketType } from './testing.types';
+import {
+  ChirpStackHttpUplinkDTO,
+  DevicePacketDTO,
+  PacketDirection,
+  PacketType,
+  StandardDevicePayloadDTO,
+} from './testing.types';
 
 export class PacketProcessor {
   /**
@@ -108,6 +114,93 @@ export class PacketProcessor {
       direction: packet.direction || 'uplink',
       packet_type: packet.packet_type || 'UNCONFIRMED_DATA_UP',
       received_at: new Date(),
+    };
+  }
+
+  /**
+   * Parse ChirpStack v4/v3 HTTP Integration uplink webhook payload:
+   * Extracts standard unified RF parameters (RSSI, SNR, FCNT, SF, FREQUENCY, RAW_PAYLOAD)
+   * and invokes decoder callback or built-in decoder for dynamic sensor payload fields.
+   */
+  public static async parseChirpStackHttpUplink(
+    payload: ChirpStackHttpUplinkDTO,
+    decoderCallback?: (
+      rawHex: string,
+      fPort?: number,
+      metadata?: Record<string, any>
+    ) => Promise<Record<string, any>> | Record<string, any>
+  ): Promise<StandardDevicePayloadDTO> {
+    const rawData = payload.data || '';
+    const rawPayloadHex = this.toHex(rawData);
+
+    // Extract RF metadata uniformly
+    const primaryRx = (payload.rxInfo && payload.rxInfo.length > 0) ? payload.rxInfo[0] : undefined;
+    const rssi = primaryRx?.rssi !== undefined ? Number(primaryRx.rssi) : -999;
+    const snr = primaryRx?.snr !== undefined
+      ? Number(primaryRx.snr)
+      : (primaryRx?.loRaSNR !== undefined ? Number(primaryRx.loRaSNR) : 0);
+
+    const fCnt = payload.fCnt !== undefined ? Number(payload.fCnt) : 0;
+    const fPort = payload.fPort !== undefined ? Number(payload.fPort) : 1;
+
+    const sf =
+      payload.txInfo?.modulation?.lora?.spreadingFactor !== undefined
+        ? Number(payload.txInfo.modulation.lora.spreadingFactor)
+        : (payload.txInfo?.dataRate?.spreadFactor !== undefined
+            ? Number(payload.txInfo.dataRate.spreadFactor)
+            : 7);
+
+    const frequency = payload.txInfo?.frequency !== undefined ? Number(payload.txInfo.frequency) : 0;
+
+    const devEui = (
+      payload.deviceInfo?.devEui ||
+      payload.devEUI ||
+      payload.devEui ||
+      ''
+    ).trim().toUpperCase();
+
+    const deviceName = payload.deviceInfo?.deviceName || payload.deviceName || devEui;
+    const applicationId = payload.deviceInfo?.applicationId || payload.applicationID || '';
+    const receivedAt = payload.time || new Date().toISOString();
+
+    let decodedPayload: Record<string, any> = {};
+
+    if (decoderCallback && rawPayloadHex) {
+      try {
+        decodedPayload = await decoderCallback(rawPayloadHex, fPort, {
+          devEui,
+          deviceName,
+          applicationId,
+          fCnt,
+          rssi,
+          snr,
+          sf,
+          frequency,
+        });
+      } catch (err: any) {
+        decodedPayload = {
+          decode_error: String(err.message || err),
+          raw_hex: rawPayloadHex,
+        };
+      }
+    } else if (rawPayloadHex) {
+      decodedPayload = this.decodePayload(rawPayloadHex, fPort);
+    }
+
+    return {
+      dev_eui: devEui,
+      device_name: deviceName,
+      application_id: applicationId,
+      f_cnt: fCnt,
+      f_port: fPort,
+      rssi,
+      snr,
+      sf,
+      frequency,
+      raw_payload: rawPayloadHex,
+      raw_payload_base64: rawData,
+      decoded_payload: decodedPayload,
+      received_at: receivedAt,
     };
   }
 }

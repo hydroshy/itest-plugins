@@ -13,6 +13,8 @@ import {
   CreateTestBatchDTO,
   StartTestBatchExecutionDTO,
   AvailableDevicesForBatchFilter,
+  ChirpStackHttpIntegrationSetupDTO,
+  ChirpStackHttpUplinkDTO,
 } from './testing.types';
 
 export class TestingController {
@@ -416,6 +418,59 @@ export class TestingController {
       return {
         success: false,
         message: error.message || 'Lỗi cập nhật tiến độ Test Batch',
+      };
+    }
+  }
+
+  // 10. ChirpStack HTTP Integration & Live Device Payload Endpoints
+  async handleChirpStackUplink(
+    payload: ChirpStackHttpUplinkDTO,
+    decoderBridge?: {
+      resolveAndDecode?: (params: {
+        rawHex: string;
+        fPort?: number;
+        item_code?: string;
+        fw_code?: string;
+        fw_version?: string;
+        long_fw?: string;
+      }) => Promise<Record<string, any>> | Record<string, any>;
+    }
+  ) {
+    try {
+      const processed = await this.service.handleChirpStackUplink(payload, decoderBridge);
+      return {
+        success: true,
+        data: processed,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Lỗi xử lý ChirpStack Uplink',
+      };
+    }
+  }
+
+  async getLiveDevicePayloads(query?: { dev_eui?: string; limit?: number }) {
+    const list = this.service.getLiveDevicePayloads(query);
+    return {
+      success: true,
+      count: list.length,
+      data: list,
+    };
+  }
+
+  async configureChirpStackHttpIntegration(config: ChirpStackHttpIntegrationSetupDTO) {
+    try {
+      const result = await this.service.configureChirpStackHttpIntegration(config);
+      return {
+        success: result.success,
+        message: result.message,
+        data: result.integration,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Lỗi cấu hình ChirpStack HTTP Integration',
       };
     }
   }

@@ -382,6 +382,7 @@ export interface DeviceTestingListItem {
   status?: string;
   message?: string;
   error_detail?: string;
+  last_seen_at?: Date | string;
   created_at?: Date | string;
   updated_at?: Date | string;
 }
@@ -547,6 +548,85 @@ export interface AvailableDevicesForBatchFilter {
   search?: string;
   limit?: number;
 }
+
+export interface ChirpStackHttpUplinkDTO {
+  deduplicationId?: string;
+  time?: string;
+  deviceInfo?: {
+    tenantId?: string;
+    tenantName?: string;
+    applicationId?: string;
+    applicationName?: string;
+    deviceProfileId?: string;
+    deviceProfileName?: string;
+    deviceName?: string;
+    devEui?: string;
+    tags?: Record<string, any>;
+  };
+  devAddr?: string;
+  adr?: boolean;
+  dr?: number;
+  fCnt?: number;
+  fPort?: number;
+  confirmed?: boolean;
+  data?: string; // base64
+  rxInfo?: Array<{
+    gatewayId?: string;
+    uplinkId?: number;
+    gwTime?: string;
+    nsTime?: string;
+    rssi?: number;
+    snr?: number;
+    loRaSNR?: number;
+    channel?: number;
+    location?: Record<string, any>;
+    context?: string;
+  }>;
+  txInfo?: {
+    frequency?: number;
+    modulation?: {
+      lora?: {
+        bandwidth?: number;
+        spreadingFactor?: number;
+        codeRate?: string;
+      };
+    };
+    dataRate?: {
+      spreadFactor?: number;
+      bandwidth?: number;
+    };
+  };
+  [key: string]: any;
+}
+
+export interface StandardDevicePayloadDTO {
+  dev_eui: string;
+  device_name?: string;
+  application_id?: string;
+  f_cnt: number;
+  f_port: number;
+  rssi: number;
+  snr: number;
+  sf: number;
+  frequency: number;
+  raw_payload: string; // Uppercase Hex string
+  raw_payload_base64?: string;
+  decoded_payload: Record<string, any>;
+  received_at: Date | string;
+  item_code?: string;
+  fw_code?: string;
+  fw_version?: string;
+  long_fw?: string;
+}
+
+export interface ChirpStackHttpIntegrationSetupDTO {
+  application_id: string;
+  network_server_url: string;
+  api_token: string;
+  webhook_endpoint_url: string;
+  headers?: Record<string, string>;
+}
+
 
 
 

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { TestingPlugin, PacketProcessor, TestingService, ATHRegisterDecoder } from '../dist/index.js';
+import { TestingPlugin, PacketProcessor, TestingService, TestingController, ATHRegisterDecoder } from '../dist/index.js';
 
 describe('Testing Plugin Tests', () => {
   const plugin = new TestingPlugin();
@@ -829,6 +829,143 @@ describe('Testing Plugin Tests', () => {
       const refRes = await controller.getReferenceDevices({ item_code: '5F0820' });
       assert.strictEqual(refRes.success, true);
       assert.strictEqual(refRes.data.length >= 1, true);
+    });
+  });
+
+  describe('9. ChirpStack v4 HTTP Integration & Dynamic Sensor Payload Decoding', () => {
+    it('should parse ChirpStack v4 HTTP Integration uplink webhook and extract uniform RF parameters', async () => {
+      // Sample ChirpStack v4 JSON webhook payload
+      const uplinkPayload = {
+        deduplicationId: 'dedup-12345',
+        time: '2026-11-03T03:50:00.000+00:00',
+        deviceInfo: {
+          tenantId: 'tenant-01',
+          tenantName: 'Daviteq Tenant',
+          applicationId: 'app-default-uuid',
+          applicationName: 'ITEST Default App',
+          deviceProfileId: 'dp-wslrw-di',
+          deviceProfileName: 'WSLRW-DI Profile',
+          deviceName: 'WSLRW-DI-NODE-01',
+          devEui: '001bc5094052ef57',
+        },
+        devAddr: '01020304',
+        fCnt: 142,
+        fPort: 1,
+        data: 'AQMBAgMEBQYHCA==', // Base64 of 01030102030405060708 (10 bytes)
+        rxInfo: [
+          {
+            gatewayId: '0016c001f1122334',
+            rssi: -78,
+            snr: 9.5,
+            channel: 2,
+          },
+        ],
+        txInfo: {
+          frequency: 923200000,
+          modulation: {
+            lora: {
+              bandwidth: 125000,
+              spreadingFactor: 9,
+              codeRate: 'CR_4_5',
+            },
+          },
+        },
+      };
+
+      const result = await PacketProcessor.parseChirpStackHttpUplink(uplinkPayload);
+
+      assert.strictEqual(result.dev_eui, '001BC5094052EF57');
+      assert.strictEqual(result.device_name, 'WSLRW-DI-NODE-01');
+      assert.strictEqual(result.application_id, 'app-default-uuid');
+      assert.strictEqual(result.f_cnt, 142);
+      assert.strictEqual(result.f_port, 1);
+      assert.strictEqual(result.rssi, -78);
+      assert.strictEqual(result.snr, 9.5);
+      assert.strictEqual(result.sf, 9);
+      assert.strictEqual(result.frequency, 923200000);
+      assert.strictEqual(result.raw_payload, '01030102030405060708');
+    });
+
+    it('should link with decoder plugin to parse dynamic sensor parameters for registered device', async () => {
+      const service = new TestingService();
+      const controller = new TestingController(service);
+
+      // Seed a testing device
+      service.addDeviceTestingItem({
+        id: 'dev-payload-test-01',
+        serial_number: 'SN-DI-2026-001',
+        item_code: 'WSLRW-DI-01',
+        fw_code: 'WSLRW-DI',
+        fw_version: '3',
+        long_fw: '3',
+        dev_eui: '001BC5094052EF57',
+        created_by: 'tester',
+      });
+
+      const uplinkPayload = {
+        time: '2026-11-03T03:52:00.000+00:00',
+        deviceInfo: {
+          devEui: '001bc5094052ef57',
+          deviceName: 'WSLRW-DI-001',
+          applicationId: 'app-default-uuid',
+        },
+        fCnt: 143,
+        fPort: 1,
+        data: 'AQMBAgMEBQYHCA==', // 01030102030405060708
+        rxInfo: [{ rssi: -82, snr: 8.2 }],
+        txInfo: {
+          frequency: 923400000,
+          modulation: { lora: { spreadingFactor: 7 } },
+        },
+      };
+
+      // Mock decoder bridge invoking decoder plugin
+      const decoderBridge = {
+        resolveAndDecode: async (params) => {
+          assert.strictEqual(params.item_code, 'WSLRW-DI-01');
+          assert.strictEqual(params.fw_code, 'WSLRW-DI');
+          return {
+            EVENT_ID: 0,
+            HW_VERSION: 1,
+            FW_VERSION: 3,
+            CURRENT_CONFIGURATION: '0102030405060708',
+          };
+        },
+      };
+
+      const res = await controller.handleChirpStackUplink(uplinkPayload, decoderBridge);
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.data.dev_eui, '001BC5094052EF57');
+      assert.strictEqual(res.data.item_code, 'WSLRW-DI-01');
+      assert.strictEqual(res.data.fw_code, 'WSLRW-DI');
+      assert.strictEqual(res.data.decoded_payload.FW_VERSION, 3);
+      assert.strictEqual(res.data.decoded_payload.CURRENT_CONFIGURATION, '0102030405060708');
+
+      // Verify live payload query
+      const liveRes = await controller.getLiveDevicePayloads({ dev_eui: '001BC5094052EF57' });
+      assert.strictEqual(liveRes.success, true);
+      assert.strictEqual(liveRes.count, 1);
+      assert.strictEqual(liveRes.data[0].dev_eui, '001BC5094052EF57');
+    });
+
+    it('should configure ChirpStack HTTP Integration with application_id and endpoint URL', async () => {
+      const service = new TestingService();
+      const controller = new TestingController(service);
+
+      const setupRes = await controller.configureChirpStackHttpIntegration({
+        application_id: 'app-default-uuid',
+        network_server_url: 'http://chirpstack.internal:8080',
+        api_token: 'test-api-token',
+        webhook_endpoint_url: 'http://itest-backend:3000/api/plugins/testing/integrations/chirpstack/uplink',
+      });
+
+      assert.strictEqual(setupRes.success, true);
+      assert.ok(setupRes.message.includes('app-default-uuid'));
+      assert.strictEqual(setupRes.data.applicationId, 'app-default-uuid');
+      assert.strictEqual(
+        setupRes.data.eventEndpointUrl,
+        'http://itest-backend:3000/api/plugins/testing/integrations/chirpstack/uplink'
+      );
     });
   });
 });

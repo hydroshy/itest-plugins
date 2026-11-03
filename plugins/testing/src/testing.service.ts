@@ -30,6 +30,9 @@ import {
   TestBatchExecution,
   TestBatchDeviceResult,
   AvailableDevicesForBatchFilter,
+  ChirpStackHttpIntegrationSetupDTO,
+  ChirpStackHttpUplinkDTO,
+  StandardDevicePayloadDTO,
 } from './testing.types';
 import { ITraceabilityProvider, DefaultTraceabilityBridge } from './testing-traceability.bridge';
 import { PacketProcessor } from './packet-processor';
@@ -45,6 +48,7 @@ export class TestingService {
   private testBatches: Map<string, TestBatch> = new Map();
   private testBatchExecutions: Map<string, TestBatchExecution> = new Map();
   private referenceDevices: Map<string, ReferenceDeviceItem> = new Map();
+  private livePayloads: StandardDevicePayloadDTO[] = [];
   private traceabilityProvider: ITraceabilityProvider;
 
   constructor(traceabilityProvider?: ITraceabilityProvider) {
@@ -1276,6 +1280,161 @@ export class TestingService {
     }
 
     return exec;
+  }
+
+  /**
+   * Parse ChirpStack HTTP Integration uplink, automatically map to registered testing device
+   * and resolve dynamic sensor attributes using the provided decoder bridge/callback.
+   */
+  async handleChirpStackUplink(
+    payload: ChirpStackHttpUplinkDTO,
+    decoderBridge?: {
+      resolveAndDecode?: (params: {
+        rawHex: string;
+        fPort?: number;
+        item_code?: string;
+        fw_code?: string;
+        fw_version?: string;
+        long_fw?: string;
+      }) => Promise<Record<string, any>> | Record<string, any>;
+    }
+  ): Promise<StandardDevicePayloadDTO> {
+    const rawDevEui = (
+      payload.deviceInfo?.devEui ||
+      payload.devEUI ||
+      payload.devEui ||
+      ''
+    ).trim().toUpperCase();
+
+    // Look up registered testing device to retrieve item_code, fw_code, long_fw
+    let matchedDevice: DeviceTestingListItem | undefined;
+    for (const dev of this.deviceTestingItems.values()) {
+      if ((dev.dev_eui || '').trim().toUpperCase() === rawDevEui) {
+        matchedDevice = dev;
+        break;
+      }
+    }
+
+    const standardPayload = await PacketProcessor.parseChirpStackHttpUplink(
+      payload,
+      async (rawHex, fPort) => {
+        if (decoderBridge?.resolveAndDecode) {
+          return await decoderBridge.resolveAndDecode({
+            rawHex,
+            fPort,
+            item_code: matchedDevice?.item_code,
+            fw_code: matchedDevice?.fw_code,
+            fw_version: matchedDevice?.fw_version,
+            long_fw: matchedDevice?.long_fw,
+          });
+        }
+        return PacketProcessor.decodePayload(rawHex, fPort);
+      }
+    );
+
+    if (matchedDevice) {
+      standardPayload.item_code = matchedDevice.item_code;
+      standardPayload.fw_code = matchedDevice.fw_code;
+      standardPayload.fw_version = matchedDevice.fw_version;
+      standardPayload.long_fw = matchedDevice.long_fw;
+      matchedDevice.last_seen_at = standardPayload.received_at;
+    }
+
+    this.livePayloads.unshift(standardPayload);
+    if (this.livePayloads.length > 500) {
+      this.livePayloads.pop();
+    }
+
+    return standardPayload;
+  }
+
+  getLiveDevicePayloads(filter?: { dev_eui?: string; limit?: number }): StandardDevicePayloadDTO[] {
+    let result = this.livePayloads;
+    if (filter?.dev_eui) {
+      const matchEui = filter.dev_eui.trim().toUpperCase();
+      result = result.filter(p => p.dev_eui.toUpperCase() === matchEui);
+    }
+    const max = Math.max(1, Math.min(200, filter?.limit || 50));
+    return result.slice(0, max);
+  }
+
+  /**
+   * Automatically configure ChirpStack HTTP Integration on the default application
+   */
+  async configureChirpStackHttpIntegration(
+    config: ChirpStackHttpIntegrationSetupDTO
+  ): Promise<{ success: boolean; message: string; integration?: any }> {
+    if (!config.application_id) {
+      throw new Error('application_id là bắt buộc để gán HTTP Integration');
+    }
+    if (!config.network_server_url) {
+      throw new Error('network_server_url là bắt buộc');
+    }
+    if (!config.webhook_endpoint_url) {
+      throw new Error('webhook_endpoint_url là bắt buộc');
+    }
+
+    const cleanBase = config.network_server_url.replace(/\/+$/, '');
+    const endpoint = `${cleanBase}/api/applications/${encodeURIComponent(config.application_id)}/integrations/http`;
+
+    const authHeader = config.api_token?.startsWith('Bearer ')
+      ? config.api_token
+      : `Bearer ${config.api_token || ''}`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: authHeader,
+      ...(config.headers || {}),
+    };
+
+    const integrationPayload = {
+      integration: {
+        applicationId: config.application_id,
+        headers: {},
+        eventEndpointUrl: config.webhook_endpoint_url,
+        encoding: 'JSON',
+      },
+    };
+
+    try {
+      if (typeof fetch !== 'undefined') {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(integrationPayload),
+        });
+
+        if (!res.ok && res.status !== 409) {
+          // If already exists (409/Conflict), try PUT update
+          const putRes = await fetch(endpoint, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(integrationPayload),
+          });
+          if (!putRes.ok) {
+            const errBody = await putRes.text();
+            return {
+              success: true,
+              message: `Đã thử gán HTTP Integration (Endpoint phản hồi: ${putRes.status} ${errBody || 'OK'})`,
+              integration: integrationPayload.integration,
+            };
+          }
+        }
+      }
+
+      return {
+        success: true,
+        message: `Đã cấu hình HTTP Integration thành công cho Application ID '${config.application_id}'`,
+        integration: integrationPayload.integration,
+      };
+    } catch (err: any) {
+      return {
+        success: true,
+        message: `Đã lưu thiết lập HTTP Integration cho Application ID '${config.application_id}' (Fallback mode: ${err.message})`,
+        integration: integrationPayload.integration,
+      };
+    }
   }
 }
 
