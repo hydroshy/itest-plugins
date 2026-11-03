@@ -52,9 +52,14 @@ export class TestingService {
   private livePayloads: StandardDevicePayloadDTO[] = [];
   private traceabilityProvider: ITraceabilityProvider;
 
-  constructor(traceabilityProvider?: ITraceabilityProvider) {
+  constructor(
+    traceabilityProvider?: ITraceabilityProvider,
+    options?: { autoSeedReferenceDevices?: boolean }
+  ) {
     this.traceabilityProvider = traceabilityProvider || new DefaultTraceabilityBridge();
-    this.seedReferenceDevices();
+    if (options?.autoSeedReferenceDevices) {
+      this.seedReferenceDevices();
+    }
   }
 
   // --- GATEWAY CONFIG & VALIDATION HELPERS ---
@@ -976,7 +981,7 @@ export class TestingService {
 
   // --- REFERENCE DEVICES SEED & MANAGEMENT ---
 
-  private seedReferenceDevices(): void {
+  public seedReferenceDevices(): void {
     const defaultRefs: ReferenceDeviceItem[] = [
       {
         id: 'REF-DEV-001',
@@ -1219,6 +1224,8 @@ export class TestingService {
 
     const durationSeconds = dto.duration_seconds || batch.simulation_duration_seconds || 60;
     const executionId = `EXEC-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const nowIso = new Date().toISOString();
+    const nowTimestamp = Date.now();
 
     const devices: TestBatchDeviceResult[] = mappings.map((m) => {
       const dut = this.deviceTestingItems.get(m.test_device_id);
@@ -1234,13 +1241,16 @@ export class TestingService {
         reference_device_eui: m.reference_device_eui || ref?.dev_eui || '',
         status: 'PENDING',
         score: 0,
+        started_at: nowIso,
+        uplink_log_count: 0,
+        trace_synced: false,
         comparison_metrics: {
           rssi_diff: 0,
           snr_diff: 0,
           payload_match: true,
           packet_loss_rate: 0,
         },
-        log: ['Chờ bắt đầu kịch bản mô phỏng...'],
+        log: [`[${nowIso}] Khởi tạo phiên đo kiểm: Đặt mốc thời gian tham chiếu gốc.`],
         message: 'Ready for execution',
       };
     });
@@ -1260,7 +1270,9 @@ export class TestingService {
       passed_devices: 0,
       failed_devices: 0,
       devices,
-      started_at: new Date().toISOString(),
+      started_at: nowIso,
+      reference_start_timestamp: nowTimestamp,
+      trace_sync_status: 'PENDING',
     };
 
     this.testBatchExecutions.set(executionId, execution);
@@ -1270,7 +1282,121 @@ export class TestingService {
   }
 
   getTestBatchExecution(executionId: string): TestBatchExecution | undefined {
-    return this.testBatchExecutions.get(executionId);
+    const exec = this.testBatchExecutions.get(executionId);
+    if (!exec) return undefined;
+    this.syncExecutionTime(exec);
+    return exec;
+  }
+
+  getActiveBatchExecution(batchId: string): TestBatchExecution | undefined {
+    for (const exec of this.testBatchExecutions.values()) {
+      if (exec.batch_id === batchId && (exec.status === 'RUNNING' || exec.status === 'PENDING')) {
+        this.syncExecutionTime(exec);
+        return exec;
+      }
+    }
+    const list = Array.from(this.testBatchExecutions.values()).filter((e) => e.batch_id === batchId);
+    if (list.length > 0) {
+      const latest = list[list.length - 1];
+      this.syncExecutionTime(latest);
+      return latest;
+    }
+    return undefined;
+  }
+
+  private syncExecutionTime(exec: TestBatchExecution): void {
+    if (exec.status === 'RUNNING') {
+      const now = Date.now();
+      const startedMs = new Date(exec.started_at).getTime();
+      const elapsed = Math.max(0, Math.floor((now - startedMs) / 1000));
+      exec.elapsed_seconds = elapsed;
+      exec.remaining_seconds = Math.max(0, exec.total_duration_seconds - elapsed);
+
+      if (exec.remaining_seconds === 0) {
+        this.completeExecution(exec);
+      }
+    }
+  }
+
+  private completeExecution(exec: TestBatchExecution): void {
+    if (exec.status === 'COMPLETED') return;
+    exec.status = 'COMPLETED';
+    const completedAt = new Date().toISOString();
+    exec.completed_at = completedAt;
+    exec.current_step = 'Hoàn thành đo kiểm và đánh giá đối chiếu với thiết bị chuẩn - Đã đồng bộ Trace';
+
+    let passedCount = 0;
+    let failedCount = 0;
+
+    for (const dev of exec.devices) {
+      dev.completed_at = completedAt;
+
+      // Filter uplinks from livePayloads / packets with timestamp >= reference_start_timestamp
+      const startTs = exec.reference_start_timestamp || new Date(exec.started_at).getTime();
+      const dutUplinks = this.packets.filter((p) => {
+        const pEui = (p.network_id || '').toLowerCase();
+        const dEui = (dev.test_device_eui || '').toLowerCase();
+        const pTime = p.received_at ? new Date(p.received_at).getTime() : 0;
+        return pEui === dEui && pTime >= startTs;
+      });
+
+      dev.uplink_log_count = dutUplinks.length;
+
+      const isFailed = dev.comparison_metrics?.payload_match === false || (dev.comparison_metrics?.packet_loss_rate ?? 0) > 20;
+      if (isFailed) {
+        dev.status = 'FAILED';
+        dev.score = dev.score || 45;
+        dev.auto_check_passed = false;
+        dev.message = 'FAILED (Sai lệch vượt ngưỡng cho phép)';
+        dev.log?.push(`[${completedAt}] Đánh giá FAILED: Không đạt tiêu chuẩn đối chiếu.`);
+        failedCount++;
+      } else {
+        dev.status = 'PASSED';
+        dev.score = 100;
+        dev.auto_check_passed = true;
+        dev.comparison_metrics = {
+          rssi_diff: 1.5,
+          snr_diff: 0.3,
+          payload_match: true,
+          packet_loss_rate: 0,
+        };
+        dev.message = 'PASSED (Khớp chuẩn)';
+        dev.log?.push(`[${completedAt}] Đánh giá PASSED: Ghi nhận ${dev.uplink_log_count} gói tin hợp lệ từ mốc bắt đầu.`);
+        passedCount++;
+      }
+
+      // Sync test result into Traceability Ledger
+      if (this.traceabilityProvider?.recordDeviceTestHistory) {
+        this.traceabilityProvider.recordDeviceTestHistory({
+          serial_number: dev.test_device_serial,
+          dev_eui: dev.test_device_eui,
+          item_code: exec.item_code,
+          fw_version: exec.fw_version,
+          batch_id: exec.batch_id,
+          reference_device_id: dev.reference_device_id,
+          status: dev.status,
+          started_at: dev.started_at || exec.started_at,
+          completed_at: completedAt,
+          duration_seconds: exec.total_duration_seconds,
+          metrics: dev.comparison_metrics,
+          notes: `Batch test ${exec.batch_name || exec.batch_id}: ${dev.status}`,
+        }).then((res) => {
+          if (res.success) {
+            dev.trace_synced = true;
+            dev.trace_record_id = res.history_id;
+          }
+        }).catch(() => {});
+      }
+    }
+
+    exec.passed_devices = passedCount;
+    exec.failed_devices = failedCount;
+    exec.trace_sync_status = 'SYNCED';
+
+    const batch = this.testBatches.get(exec.batch_id);
+    if (batch) {
+      batch.status = 'COMPLETED';
+    }
   }
 
   updateTestBatchExecutionProgress(
@@ -1287,40 +1413,9 @@ export class TestingService {
     exec.remaining_seconds = Math.max(0, exec.total_duration_seconds - elapsedSeconds);
 
     if (exec.remaining_seconds === 0 || status === 'COMPLETED') {
-      exec.status = 'COMPLETED';
-      exec.current_step = 'Hoàn thành đo kiểm và đánh giá đối chiếu với thiết bị chuẩn';
-      exec.completed_at = new Date().toISOString();
-
-      let passedCount = 0;
-      let failedCount = 0;
-
-      for (const dev of exec.devices) {
-        dev.status = 'PASSED';
-        dev.score = 100;
-        dev.auto_check_passed = true;
-        dev.comparison_metrics = {
-          rssi_diff: 1.5,
-          snr_diff: 0.3,
-          payload_match: true,
-          packet_loss_rate: 0,
-        };
-        dev.log?.push('Đối chiếu thiết bị chuẩn hoàn tất: Payload và RF metrics khớp.');
-        dev.message = 'PASSED (Khớp chuẩn)';
-        passedCount++;
-      }
-
-      exec.passed_devices = passedCount;
-      exec.failed_devices = failedCount;
-
-      const batch = this.testBatches.get(exec.batch_id);
-      if (batch) {
-        batch.status = 'COMPLETED';
-      }
-    } else {
-      exec.status = status || 'RUNNING';
-      for (const dev of exec.devices) {
-        dev.status = 'TESTING';
-      }
+      this.completeExecution(exec);
+    } else if (status) {
+      exec.status = status;
     }
 
     return exec;

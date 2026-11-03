@@ -3,9 +3,12 @@ import * as assert from 'node:assert';
 import { TestingService } from '../src/testing.service';
 import { PacketProcessor } from '../src/packet-processor';
 import { TestingPlugin } from '../src/index';
+import { DefaultTraceabilityBridge } from '../src/testing-traceability.bridge';
 
 describe('Testing Plugin Tests', () => {
-  const plugin = new TestingPlugin();
+  const bridge = new DefaultTraceabilityBridge();
+  bridge.seedSampleData();
+  const plugin = new TestingPlugin(bridge, { autoSeedReferenceDevices: true });
   const service = plugin.getService();
 
   describe('1. Traceability Lookup', () => {

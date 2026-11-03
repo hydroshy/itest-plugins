@@ -525,6 +525,21 @@ export interface StartTestBatchExecutionDTO {
   started_by?: string;
 }
 
+export interface DeviceTestHistoryRecord {
+  serial_number: string;
+  dev_eui?: string;
+  item_code: string;
+  fw_version: string;
+  batch_id: string;
+  reference_device_id: string;
+  status: 'PASSED' | 'FAILED';
+  started_at: string;
+  completed_at: string;
+  duration_seconds?: number;
+  metrics?: Record<string, any>;
+  notes?: string;
+}
+
 export interface TestBatchDeviceResult {
   test_device_id: string;
   test_device_serial: string;
@@ -535,6 +550,11 @@ export interface TestBatchDeviceResult {
   status: 'PENDING' | 'TESTING' | 'PASSED' | 'FAILED';
   score?: number;
   auto_check_passed?: boolean;
+  started_at?: string;
+  completed_at?: string;
+  uplink_log_count?: number;
+  trace_synced?: boolean;
+  trace_record_id?: string;
   comparison_metrics?: {
     rssi_diff?: number;
     snr_diff?: number;
@@ -560,8 +580,10 @@ export interface TestBatchExecution {
   passed_devices: number;
   failed_devices: number;
   devices: TestBatchDeviceResult[];
-  started_at: Date | string;
-  completed_at?: Date | string;
+  started_at: string;
+  completed_at?: string;
+  reference_start_timestamp?: number;
+  trace_sync_status?: 'PENDING' | 'SYNCED' | 'FAILED';
 }
 
 export interface AvailableDevicesForBatchFilter {

@@ -1,9 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { TestingPlugin, PacketProcessor, TestingService, TestingController, ATHRegisterDecoder } from '../dist/index.js';
+import { TestingPlugin, PacketProcessor, TestingService, TestingController, ATHRegisterDecoder, DefaultTraceabilityBridge } from '../dist/index.js';
 
 describe('Testing Plugin Tests', () => {
-  const plugin = new TestingPlugin();
+  const bridge = new DefaultTraceabilityBridge();
+  bridge.seedSampleData();
+  const plugin = new TestingPlugin(bridge, { autoSeedReferenceDevices: true });
   const service = plugin.getService();
   const controller = plugin.getController();
 
@@ -802,6 +804,21 @@ describe('Testing Plugin Tests', () => {
       assert.strictEqual(completedExec.passed_devices, 1);
       assert.strictEqual(completedExec.devices[0].status, 'PASSED');
       assert.strictEqual(completedExec.devices[0].auto_check_passed, true);
+      assert.ok(completedExec.started_at);
+      assert.ok(completedExec.completed_at);
+      assert.ok(completedExec.reference_start_timestamp);
+      assert.strictEqual(completedExec.trace_sync_status, 'SYNCED');
+      assert.ok(completedExec.devices[0].started_at);
+      assert.ok(completedExec.devices[0].completed_at);
+
+      // Verify Traceability sync record
+      const historyRecords = bridge.getTestHistoryRecords();
+      assert.strictEqual(historyRecords.length > 0, true);
+      const devRecord = historyRecords.find((r) => r.serial_number === 'SN-BATCH-01');
+      assert.ok(devRecord);
+      assert.strictEqual(devRecord.status, 'PASSED');
+      assert.ok(devRecord.started_at);
+      assert.ok(devRecord.completed_at);
     });
 
     it('should test controller endpoints for test batches and executions', async () => {
@@ -829,6 +846,21 @@ describe('Testing Plugin Tests', () => {
       const refRes = await controller.getReferenceDevices({ item_code: '5F0820' });
       assert.strictEqual(refRes.success, true);
       assert.strictEqual(refRes.data.length >= 1, true);
+
+      // Verify getActiveTestBatchExecution
+      const activeRes = await controller.getActiveTestBatchExecution(createRes.data.id);
+      assert.strictEqual(activeRes.success, false); // No running execution yet
+
+      const startRes = await controller.startTestBatchExecution({
+        batch_id: createRes.data.id,
+        duration_seconds: 60,
+        device_mappings: [{ test_device_id: 'dev-batch-01', reference_device_id: refRes.data[0].id }],
+      });
+      assert.strictEqual(startRes.success, true);
+      const activeAfterStart = await controller.getActiveTestBatchExecution(createRes.data.id);
+      assert.strictEqual(activeAfterStart.success, true);
+      assert.strictEqual(activeAfterStart.data.status, 'RUNNING');
+      assert.ok(activeAfterStart.data.started_at);
     });
   });
 

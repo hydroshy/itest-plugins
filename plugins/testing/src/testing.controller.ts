@@ -400,6 +400,20 @@ export class TestingController {
     };
   }
 
+  async getActiveTestBatchExecution(batchId: string) {
+    const exec = this.service.getActiveBatchExecution(batchId);
+    if (!exec) {
+      return {
+        success: false,
+        message: `Không có Execution nào đang chạy cho Batch '${batchId}'`,
+      };
+    }
+    return {
+      success: true,
+      data: exec,
+    };
+  }
+
   async updateTestBatchExecutionProgress(
     executionId: string,
     elapsedSeconds: number,

@@ -13,8 +13,11 @@ export class TestingPlugin {
   private service: TestingService;
   private controller: TestingController;
 
-  constructor() {
-    this.service = new TestingService(new DefaultTraceabilityBridge());
+  constructor(
+    traceabilityBridge?: import('./testing-traceability.bridge').ITraceabilityProvider,
+    options?: { autoSeedReferenceDevices?: boolean }
+  ) {
+    this.service = new TestingService(traceabilityBridge || new DefaultTraceabilityBridge(), options);
     this.controller = new TestingController(this.service);
   }
 
