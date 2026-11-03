@@ -125,6 +125,23 @@ export class LoRaWANScriptRunner {
       Buffer: {
         from: (data: any, encoding?: any) => Buffer.from(data, encoding),
       },
+      // LoRaWAN & Daviteq bitmask / conversion helpers
+      UINT8: (b: any) => (Number(b) || 0) & 0xff,
+      UINT16: (b1: any, b2: any) => (((Number(b1) || 0) & 0xff) << 8) | ((Number(b2) || 0) & 0xff),
+      UINT32: (b1: any, b2: any, b3: any, b4: any) =>
+        ((Number(b1) || 0) & 0xff) * 0x1000000 +
+        (((Number(b2) || 0) & 0xff) << 16) +
+        (((Number(b3) || 0) & 0xff) << 8) +
+        ((Number(b4) || 0) & 0xff),
+      HEX: (...args: any[]) => {
+        let hex = '';
+        for (const b of args) {
+          if (b === undefined || b === null || isNaN(b) || b === 'na') continue;
+          const h = (Number(b) & 0xff).toString(16);
+          hex += h.length < 2 ? '0' + h : h;
+        }
+        return hex;
+      },
     };
 
     const context = vm.createContext(sandbox);
@@ -264,4 +281,69 @@ function decodeUplink(input) {
 }
 `;
   }
+
+  /**
+   * Provide the Daviteq standard decoder template (e.g. WSLRW-DI FW 3) with sub-functions
+   */
+  static getDaviteqTemplate(): string {
+    return DEFAULT_DAVITEQ_WSLRW_DI_TEMPLATE;
+  }
 }
+
+export const DEFAULT_DAVITEQ_WSLRW_DI_TEMPLATE = `function decodeUplink(input) {
+// Java Script Decoder for SKU WSLRW-DI firmware 3 on Things Stack (TTN)/Chirpstack Network Server. For other Network Servers, please update decoded function name corresponding to the Network Server and convert input raw payload to 'byte' array
+var byte = input.bytes;
+var data = {};
+if (byte.length == 10 || byte.length == 11 || byte.length == 8) {
+  data = {
+    EVENT_ID: (byte[0]>>4)===0 ? UINT8((byte[0])>>4) : (byte[0]>>4)===1 ? UINT8((byte[0])>>4) : (byte[0]>>4)===2 ? UINT8((byte[0])>>4) : (byte[0]>>4)===3 ? UINT8((byte[0])>>4) : (byte[0]>>4)===4 ? UINT8((byte[0])>>4) : (byte[0]>>4)===5 ? UINT8((byte[0])>>4) : (byte[0]>>4)===15 ? UINT8((byte[0])>>4) : (byte[0]>>4)===13 ? UINT8((byte[0])>>4) : "NULL",
+    HW_VERSION: (byte[0]>>4)===0 ? UINT8((byte[0]& 0x0F)) : (byte[0]>>4)===1 ? UINT8((byte[0]& 0x0F)) : (byte[0]>>4)===5 ? UINT8((byte[0]& 0x0F)) : (byte[0]>>4)===15 ? UINT8((byte[0]& 0x0F)) : "NULL",
+    FW_VERSION: (byte[0]>>4)===0 ? UINT8(byte[1]) : (byte[0]>>4)===1 ? UINT8(byte[1]) : (byte[0]>>4)===5 ? UINT8(byte[1]) : (byte[0]>>4)===15 ? UINT8(byte[1]) : "NULL",
+    CURRENT_CONFIGURATION: (byte[0]>>4)===0 ? HEX(byte[2],byte[3],byte[4],byte[5],byte[6],byte[7],byte[8],byte[9]) : (byte[0]>>4)===1 ? HEX(byte[2],byte[3],byte[4],byte[5],byte[6],byte[7],byte[8],byte[9]) : (byte[0]>>4)===5 ? HEX(byte[2],byte[3],byte[4],byte[5],byte[6],byte[7],byte[8],byte[9]) : (byte[0]>>4)===15 ? HEX(byte[2],byte[3],byte[4],byte[5],byte[6],byte[7],byte[8],byte[9]) : "NULL",
+    ALERT_STATUS: (byte[0]>>4)===2 ? UINT8(((byte[1])>>6)) : (byte[0]>>4)===3 ? UINT8(((byte[1])>>6)) : (byte[0]>>4)===4 ? UINT8(((byte[1])>>6)) : "NULL",
+    POWER_LEVEL: (byte[0]>>4)===2 ? UINT8(((byte[1]& 0x3F)>>4)) : (byte[0]>>4)===3 ? UINT8(((byte[1]& 0x3F)>>4)) : (byte[0]>>4)===4 ? UINT8(((byte[1]& 0x3F)>>4)) : "NULL",
+    POWER_SOURCE: (byte[0]>>4)===2 ? UINT8((byte[0]& 0x0F)>>3) : (byte[0]>>4)===3 ? UINT8((byte[0]& 0x0F)>>3) : (byte[0]>>4)===4 ? UINT8((byte[0]& 0x0F)>>3) : "NULL",
+    OPERATION_MODE: (byte[0]>>4)===2 ? UINT8(((byte[1]& 0x0F))) : (byte[0]>>4)===3 ? UINT8(((byte[1]& 0x0F))) : (byte[0]>>4)===4 ? UINT8(((byte[1]& 0x0F))) : "NULL",
+    NRS_COUNTER_DI1: (byte[0]>>4)===2 ? UINT32(byte[2],byte[3],byte[4],byte[5]) : (byte[0]>>4)===3 ? UINT32(byte[2],byte[3],byte[4],byte[5]) : (byte[0]>>4)===4 ? UINT32(byte[2],byte[3],byte[4],byte[5]) : "NULL",
+    RS_COUNTER_DI1: (byte[0]>>4)===2 ? UINT32(byte[6],byte[7],byte[8],byte[9]) : (byte[0]>>4)===3 ? UINT32(byte[6],byte[7],byte[8],byte[9]) : (byte[0]>>4)===4 ? UINT32(byte[6],byte[7],byte[8],byte[9]) : "NULL",
+    STATUS_DI1: (byte[0]>>4)===2 ? UINT8(((byte[10])>>4)) : (byte[0]>>4)===3 ? UINT8(((byte[10])>>4)) : (byte[0]>>4)===4 ? UINT8(((byte[10])>>4)) : "NULL",
+    STATUS_DI2: (byte[0]>>4)===2 ? UINT8(((byte[10]& 0x0F))) : (byte[0]>>4)===3 ? UINT8(((byte[10]& 0x0F))) : (byte[0]>>4)===4 ? UINT8(((byte[10]& 0x0F))) : "NULL",
+    ALARM_RESEND_NO: (byte[0]>>4)===4 ? UINT8((byte[0]& 0x07)) : "NULL",
+    CYCLE_RESEND_NO: (byte[0]>>4)===3 ? UINT8((byte[0]& 0x07)) : "NULL",
+    START_ADDRESS: (byte[0]>>4)===13 ? UINT16(byte[1],byte[2]) : "NULL",
+    NUM_OF_REGISTER: (byte[0]>>4)===13 ? UINT8(byte[3]) : "NULL",
+    CONTENT_OF_REGISTER: (byte[0]>>4)===13 ? HEX(byte[4],byte[5],byte[6],byte[7]) : "NULL",
+  };
+}
+for (var parameter in data) {
+  if (data[parameter] == "NULL") delete data[parameter];
+}
+return {
+  data: data,
+  warnings: [],
+  errors: []
+};
+}
+
+// Sub Functions
+function UINT8(byte) {
+  return (byte || 0) & 0xFF;
+}
+function UINT16(byte1, byte2) {
+  return (((byte1 || 0) & 0xFF) << 8) | ((byte2 || 0) & 0xFF);
+}
+function UINT32(byte1, byte2, byte3, byte4) {
+  return (((byte1 || 0) & 0xFF) * Math.pow(2, 24)) + (((byte2 || 0) & 0xFF) * Math.pow(2, 16)) + (((byte3 || 0) & 0xFF) * Math.pow(2, 8)) + ((byte4 || 0) & 0xFF);
+}
+function HEX(byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10) {
+  var bytes = [byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10];
+  var hex = '';
+  for (var i = 0; i < bytes.length; i++) {
+    if (bytes[i] === undefined || bytes[i] === null || isNaN(bytes[i]) || bytes[i] === "na") continue;
+    var hexByte = (Number(bytes[i]) & 0xFF).toString(16);
+    if (hexByte.length < 2) hexByte = '0' + hexByte;
+    hex += hexByte;
+  }
+  return hex;
+}
+`;

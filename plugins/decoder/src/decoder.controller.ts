@@ -86,11 +86,52 @@ export class DecoderController {
     }
   }
 
+  async resolveForDevice(params: {
+    item_code?: string;
+    fw_code?: string;
+    fw_version?: string;
+    long_fw?: string;
+    sku?: string;
+  }) {
+    try {
+      const match = await this.service.resolveDecoderForDevice(params);
+      if (!match) {
+        return {
+          success: false,
+          error: 'No matching decoder found for the given device parameters',
+          statusCode: 404,
+        };
+      }
+      return {
+        success: true,
+        matchTier: match.matchTier,
+        data: match.script,
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message, statusCode: 500 };
+    }
+  }
+
+  getDaviteqTemplateScript() {
+    return {
+      success: true,
+      data: {
+        template: LoRaWANScriptRunner.getDaviteqTemplate(),
+        protocol: 'lorawan',
+        format: 'daviteq_wslrw_di',
+        sku: 'WSLRW-DI',
+        fwVersion: '3',
+      },
+    };
+  }
+
   getTemplateScript() {
     return {
       success: true,
       data: {
-        template: LoRaWANScriptRunner.getDefaultTemplate(),
+        template: LoRaWANScriptRunner.getDaviteqTemplate(),
+        daviteqTemplate: LoRaWANScriptRunner.getDaviteqTemplate(),
+        genericTemplate: LoRaWANScriptRunner.getDefaultTemplate(),
         protocol: 'lorawan',
         format: 'chirpstack_v4',
       },

@@ -8,6 +8,8 @@
     "lorawan-decoder",
     "js-sandbox-runner",
     "sku-long-fw-mapping",
+    "item-code-fw-code-testing-mapping",
+    "daviteq-wslrw-di-standard",
     "memmap-integration",
     "dual-payload-formatting"
   ],

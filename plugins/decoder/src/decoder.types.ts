@@ -6,6 +6,9 @@ export interface DecoderScript {
   name: string;
   sku: string;
   long_fw: string;
+  item_code?: string;
+  fw_code?: string;
+  fw_version?: string;
   script: string;
   protocol: DecoderProtocol;
   description?: string;
@@ -22,8 +25,11 @@ export interface DecoderScript {
 
 export interface CreateDecoderScriptDto {
   name: string;
-  sku: string;
-  long_fw: string;
+  sku?: string;
+  long_fw?: string;
+  item_code?: string;
+  fw_code?: string;
+  fw_version?: string;
   script: string;
   protocol?: DecoderProtocol;
   description?: string;
@@ -40,6 +46,9 @@ export interface UpdateDecoderScriptDto {
   name?: string;
   sku?: string;
   long_fw?: string;
+  item_code?: string;
+  fw_code?: string;
+  fw_version?: string;
   script?: string;
   protocol?: DecoderProtocol;
   description?: string;
@@ -70,8 +79,11 @@ export interface DecodeTestResult {
 }
 
 export interface DecodeExecuteRequest {
-  sku: string;
-  long_fw: string;
+  sku?: string;
+  long_fw?: string;
+  item_code?: string;
+  fw_code?: string;
+  fw_version?: string;
   payload: string | number[] | Buffer;
   fPort?: number;
   inputFormat?: PayloadInputFormat;
@@ -84,10 +96,14 @@ export interface DecodeExecuteResult {
   matched: boolean;
   sku: string;
   long_fw: string;
+  item_code?: string;
+  fw_code?: string;
   scriptName?: string;
   scriptId?: string;
+  matchTier?: string;
   data?: Record<string, any>;
   errors?: string[];
+  warnings?: string[];
   executionTimeMs: number;
   logs?: string[];
 }
@@ -103,9 +119,34 @@ export interface MemmapProfileSummary {
   decoder_name?: string;
 }
 
+export interface DeviceTestingResolution {
+  item_code?: string;
+  fw_code?: string;
+  fw_version?: string;
+  long_fw?: string;
+  sku?: string;
+}
+
+export interface DeviceTestingLinkItem {
+  id: string;
+  registration_code?: string;
+  serial_number?: string;
+  dev_eui?: string;
+  item_code?: string;
+  fw_code?: string;
+  fw_version?: string;
+  long_fw?: string;
+  has_decoder: boolean;
+  decoder_id?: string;
+  decoder_name?: string;
+  match_tier?: 'exact_full' | 'fw_code_fw_ver' | 'item_code_fw_ver' | 'sku_long_fw' | 'none';
+}
+
 export interface DecoderQueryFilter {
   sku?: string;
   long_fw?: string;
+  item_code?: string;
+  fw_code?: string;
   is_active?: boolean;
   protocol?: string;
   search?: string;

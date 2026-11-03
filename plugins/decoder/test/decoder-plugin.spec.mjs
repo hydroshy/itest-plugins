@@ -281,4 +281,121 @@ describe('LoRaWAN & IoT Payload Decoder Plugin Test Suite', () => {
       assert(res.data.template.includes('decodeUplink'));
     });
   });
+
+  describe('4. Daviteq WSLRW-DI Decoder & Device Testing Mapping', () => {
+    it('should execute Daviteq WSLRW-DI FW 3 decodeUplink correctly with 10-byte payload', () => {
+      const template = LoRaWANScriptRunner.getDaviteqTemplate();
+
+      // Payload 10 bytes:
+      // byte[0] = 0x01 (EVENT_ID: 0, HW_VERSION: 1)
+      // byte[1] = 0x03 (FW_VERSION: 3)
+      // bytes[2..9] = 0102030405060708 (CURRENT_CONFIGURATION: "0102030405060708")
+      const payloadHex = '01030102030405060708';
+      const res = LoRaWANScriptRunner.execute(template, payloadHex, { fPort: 1 });
+
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.data.EVENT_ID, 0);
+      assert.strictEqual(res.data.HW_VERSION, 1);
+      assert.strictEqual(res.data.FW_VERSION, 3);
+      assert.strictEqual(res.data.CURRENT_CONFIGURATION, '0102030405060708');
+    });
+
+    it('should provide injected UINT8, UINT16, UINT32, HEX sub-functions to sandbox automatically', () => {
+      const scriptUsingInjectedSubFunctions = `
+        function decodeUplink(input) {
+          var b = input.bytes;
+          return {
+            data: {
+              u8: UINT8(b[0]),
+              u16: UINT16(b[0], b[1]),
+              u32: UINT32(b[0], b[1], b[2], b[3]),
+              hex: HEX(b[0], b[1], b[2], b[3])
+            }
+          };
+        }
+      `;
+
+      const res = LoRaWANScriptRunner.execute(scriptUsingInjectedSubFunctions, '01020304');
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.data.u8, 1);
+      assert.strictEqual(res.data.u16, 258); // (1 << 8) | 2
+      assert.strictEqual(res.data.u32, 16909060); // 0x01020304
+      assert.strictEqual(res.data.hex, '01020304');
+    });
+
+    it('should register decoder with ITEM_CODE and FW_CODE and resolve for device testing via multi-tier matching', async () => {
+      const service = new DecoderService();
+      const controller = new DecoderController(service);
+
+      // Register script for WSLRW-DI
+      await controller.createScript({
+        name: 'WSLRW-DI Decoder',
+        item_code: 'WSLRW-DI-01',
+        fw_code: 'WSLRW-DI',
+        long_fw: '3',
+        fw_version: '3',
+        script: LoRaWANScriptRunner.getDaviteqTemplate(),
+      });
+
+      // Tier 1: Exact full match (item_code + fw_code + fw_version)
+      const resTier1 = await controller.resolveForDevice({
+        item_code: 'WSLRW-DI-01',
+        fw_code: 'WSLRW-DI',
+        fw_version: '3',
+      });
+      assert.strictEqual(resTier1.success, true);
+      assert.strictEqual(resTier1.matchTier, 'exact_full');
+      assert.strictEqual(resTier1.data.name, 'WSLRW-DI Decoder');
+
+      // Tier 2: Match by fw_code + fw_version
+      const resTier2 = await controller.resolveForDevice({
+        fw_code: 'WSLRW-DI',
+        fw_version: '3',
+      });
+      assert.strictEqual(resTier2.success, true);
+      assert.strictEqual(resTier2.matchTier, 'fw_code_fw_ver');
+
+      // Tier 3: Match by item_code + fw_version
+      const resTier3 = await controller.resolveForDevice({
+        item_code: 'WSLRW-DI-01',
+        fw_version: '3',
+      });
+      assert.strictEqual(resTier3.success, true);
+      assert.strictEqual(resTier3.matchTier, 'item_code_fw_ver');
+
+      // Non-matching
+      const resNone = await controller.resolveForDevice({
+        item_code: 'OTHER-CODE',
+        fw_code: 'OTHER-FW',
+        fw_version: '99',
+      });
+      assert.strictEqual(resNone.success, false);
+      assert.strictEqual(resNone.statusCode, 404);
+    });
+
+    it('should decode live payload using device testing identifiers (item_code, fw_code)', async () => {
+      const service = new DecoderService();
+      const controller = new DecoderController(service);
+
+      await controller.createScript({
+        name: 'WSLRW-DI Live Decoder',
+        item_code: 'WSLRW-DI-01',
+        fw_code: 'WSLRW-DI',
+        long_fw: '3',
+        script: LoRaWANScriptRunner.getDaviteqTemplate(),
+      });
+
+      const decodeRes = await controller.decodePayload({
+        item_code: 'WSLRW-DI-01',
+        fw_code: 'WSLRW-DI',
+        long_fw: '3',
+        payload: '01030102030405060708',
+      });
+
+      assert.strictEqual(decodeRes.success, true);
+      assert.strictEqual(decodeRes.data.matched, true);
+      assert.strictEqual(decodeRes.data.matchTier, 'exact_full');
+      assert.strictEqual(decodeRes.data.data.FW_VERSION, 3);
+    });
+  });
 });
