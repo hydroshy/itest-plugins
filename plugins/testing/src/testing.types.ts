@@ -508,9 +508,11 @@ export interface TestBatchDeviceMappingItem {
   test_device_id: string;
   test_device_serial?: string;
   test_device_eui?: string;
-  reference_device_id: string;
+  reference_device_id?: string;
   reference_device_serial?: string;
   reference_device_eui?: string;
+  so_number?: string;
+  wa_number?: string;
 }
 
 export interface StartTestBatchExecutionDTO {
@@ -523,6 +525,10 @@ export interface StartTestBatchExecutionDTO {
   duration_seconds?: number;
   timeout_seconds?: number;
   started_by?: string;
+  tested_by?: string;
+  testedBy?: string;
+  requires_reference_device?: boolean;
+  requiresReferenceDevice?: boolean;
 }
 
 export interface DeviceTestHistoryRecord {
@@ -531,11 +537,15 @@ export interface DeviceTestHistoryRecord {
   item_code: string;
   fw_version: string;
   batch_id: string;
-  reference_device_id: string;
+  reference_device_id?: string;
   status: 'PASSED' | 'FAILED';
   started_at: string;
   completed_at: string;
   duration_seconds?: number;
+  so_number?: string;
+  wa_number?: string;
+  tested_by?: string;
+  test_person?: string;
   metrics?: Record<string, any>;
   notes?: string;
 }
@@ -544,9 +554,12 @@ export interface TestBatchDeviceResult {
   test_device_id: string;
   test_device_serial: string;
   test_device_eui: string;
-  reference_device_id: string;
-  reference_device_serial: string;
-  reference_device_eui: string;
+  reference_device_id?: string;
+  reference_device_serial?: string;
+  reference_device_eui?: string;
+  so_number?: string;
+  wa_number?: string;
+  tested_by?: string;
   status: 'PENDING' | 'TESTING' | 'PASSED' | 'FAILED';
   score?: number;
   auto_check_passed?: boolean;

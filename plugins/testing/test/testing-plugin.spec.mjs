@@ -757,6 +757,32 @@ describe('Testing Plugin Tests', () => {
       );
     });
 
+    it('should reject execution when batch_id is missing', () => {
+      assert.throws(
+        () =>
+          service.startTestBatchExecution({
+            batch_id: '',
+            device_mappings: [{ test_device_id: 'dev-batch-01' }],
+          }),
+        /Vui lòng chọn Test Batch trước khi bắt đầu kiểm thử/
+      );
+    });
+
+    it('should allow execution without reference device when flow does not require it', () => {
+      const exec = service.startTestBatchExecution({
+        batch_id: createdBatchId,
+        requires_reference_device: false,
+        tested_by: 'Engineer Nguyen',
+        device_mappings: [
+          { test_device_id: 'dev-batch-01', so_number: 'SO-TEST-01', wa_number: 'WA-TEST-01' },
+        ],
+      });
+      assert.strictEqual(exec.status, 'RUNNING');
+      assert.strictEqual(exec.devices[0].tested_by, 'Engineer Nguyen');
+      assert.strictEqual(exec.devices[0].so_number, 'SO-TEST-01');
+      assert.strictEqual(exec.devices[0].reference_device_id, undefined);
+    });
+
     it('should reject execution when exceeding batch max_devices limit', () => {
       assert.throws(
         () =>

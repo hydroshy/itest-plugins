@@ -1186,7 +1186,10 @@ export class TestingService {
   }
 
   startTestBatchExecution(dto: StartTestBatchExecutionDTO): TestBatchExecution {
-    const batchId = dto.batch_id || dto.batchId || '';
+    const batchId = (dto.batch_id || dto.batchId || '').trim();
+    if (!batchId) {
+      throw new Error('Vui lòng chọn Test Batch trước khi bắt đầu kiểm thử');
+    }
     const batch = this.testBatches.get(batchId);
     if (!batch) {
       throw new Error(`Test Batch ID '${batchId}' không tồn tại`);
@@ -1203,25 +1206,36 @@ export class TestingService {
       );
     }
 
-    // Verify 1-to-1 mapping
-    const refIds = new Set<string>();
-    for (const m of mappings) {
-      if (!m.test_device_id) {
-        throw new Error('Mỗi mục kiểm thử phải có test_device_id');
+    const requiresRef = dto.requires_reference_device !== false && dto.requiresReferenceDevice !== false;
+
+    // Verify 1-to-1 mapping if reference devices are required
+    if (requiresRef) {
+      const refIds = new Set<string>();
+      for (const m of mappings) {
+        if (!m.test_device_id) {
+          throw new Error('Mỗi mục kiểm thử phải có test_device_id');
+        }
+        if (!m.reference_device_id) {
+          throw new Error(
+            `Thiết bị kiểm thử '${m.test_device_serial || m.test_device_id}' chưa được gán thiết bị chuẩn đối chiếu`
+          );
+        }
+        if (refIds.has(m.reference_device_id)) {
+          throw new Error(
+            `Thiết bị chuẩn '${m.reference_device_serial || m.reference_device_id}' bị gán trùng lặp cho nhiều thiết bị test`
+          );
+        }
+        refIds.add(m.reference_device_id);
       }
-      if (!m.reference_device_id) {
-        throw new Error(
-          `Thiết bị kiểm thử '${m.test_device_serial || m.test_device_id}' chưa được gán thiết bị chuẩn đối chiếu`
-        );
+    } else {
+      for (const m of mappings) {
+        if (!m.test_device_id) {
+          throw new Error('Mỗi mục kiểm thử phải có test_device_id');
+        }
       }
-      if (refIds.has(m.reference_device_id)) {
-        throw new Error(
-          `Thiết bị chuẩn '${m.reference_device_serial || m.reference_device_id}' bị gán trùng lặp cho nhiều thiết bị test`
-        );
-      }
-      refIds.add(m.reference_device_id);
     }
 
+    const testedBy = (dto.tested_by || dto.testedBy || dto.started_by || 'tester').trim();
     const durationSeconds = dto.duration_seconds || batch.simulation_duration_seconds || 60;
     const executionId = `EXEC-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     const nowIso = new Date().toISOString();
@@ -1229,7 +1243,7 @@ export class TestingService {
 
     const devices: TestBatchDeviceResult[] = mappings.map((m) => {
       const dut = this.deviceTestingItems.get(m.test_device_id);
-      const ref = this.referenceDevices.get(m.reference_device_id);
+      const ref = m.reference_device_id ? this.referenceDevices.get(m.reference_device_id) : undefined;
 
       return {
         test_device_id: m.test_device_id,
@@ -1237,8 +1251,11 @@ export class TestingService {
         test_device_eui: m.test_device_eui || dut?.dev_eui || '',
         reference_device_id: m.reference_device_id,
         reference_device_serial:
-          m.reference_device_serial || ref?.serial_number || m.reference_device_id,
+          m.reference_device_serial || ref?.serial_number || (m.reference_device_id ? m.reference_device_id : undefined),
         reference_device_eui: m.reference_device_eui || ref?.dev_eui || '',
+        so_number: m.so_number || dut?.so_number || (dut as any)?.so || undefined,
+        wa_number: m.wa_number || dut?.wa_number || (dut as any)?.wa || undefined,
+        tested_by: testedBy,
         status: 'PENDING',
         score: 0,
         started_at: nowIso,
@@ -1374,6 +1391,10 @@ export class TestingService {
           fw_version: exec.fw_version,
           batch_id: exec.batch_id,
           reference_device_id: dev.reference_device_id,
+          so_number: dev.so_number,
+          wa_number: dev.wa_number,
+          tested_by: dev.tested_by,
+          test_person: dev.tested_by,
           status: dev.status,
           started_at: dev.started_at || exec.started_at,
           completed_at: completedAt,
