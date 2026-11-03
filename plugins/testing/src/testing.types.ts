@@ -255,6 +255,33 @@ export interface DeviceSimulationResult {
   completed_at?: Date | string;
 }
 
+export type AutoCheckFunctionName =
+  | 'CHECKVALUE'
+  | 'CHECKAVG'
+  | 'CHECKCOUNT'
+  | 'FUNC_AVG'
+  | 'FUNC_OFFSET_AVGZERO'
+  | 'CHECKVALUE_PERIOD'
+  | 'CHECKAVG_PERIOD';
+
+export interface AutoCheckFunctionRule {
+  function_name: AutoCheckFunctionName;
+  target?: 'dut' | 'reference' | 'both';
+  parameter_name: string;
+  low_threshold?: number;
+  high_threshold?: number;
+  min_count?: number;
+  max_count?: number;
+  start_time?: string | number;
+  duration?: number;
+  standard_zero?: number;
+  start_offset_time?: number;
+  duration_offset_time?: number;
+  period_start_offset_time?: number;
+  period_duration_time?: number;
+  constant_a?: number;
+}
+
 export interface AutoCheckFieldRule {
   field: string;
   count: number;
@@ -267,6 +294,7 @@ export interface AutoCheckDeviceCriteria {
   item_code: string;
   fw_version: string;
   rules: AutoCheckFieldRule[];
+  function_rules?: AutoCheckFunctionRule[];
 }
 
 export interface AutoCheckTarget {
@@ -276,12 +304,15 @@ export interface AutoCheckTarget {
   serial_number?: string;
   packets?: DevicePacketDTO[];
   reference_packets?: DevicePacketDTO[];
+  test_start_time?: string | Date | number;
+  test_end_time?: string | Date | number;
 }
 
 export interface AutoCheckCriteria {
   dut?: AutoCheckDeviceCriteria;
   reference?: AutoCheckDeviceCriteria;
   comparisons?: { dut_field: string; reference_field: string; tolerance: number }[];
+  function_rules?: AutoCheckFunctionRule[];
   min_rssi?: number;
   max_rssi?: number;
   min_snr?: number;
@@ -292,10 +323,13 @@ export interface AutoCheckCriteria {
 
 export interface AutoCheckRuleResult {
   rule: string;
+  function_name?: AutoCheckFunctionName;
   passed: boolean;
   actual: any;
   expected: any;
   message?: string;
+  calculated_value?: number | string;
+  hex_output?: string;
 }
 
 export interface AutoCheckEvaluation {

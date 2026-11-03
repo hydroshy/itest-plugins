@@ -1026,6 +1026,153 @@ describe('Testing Plugin Tests', () => {
       );
     });
   });
+
+  describe('10. Standard FUNC_AUTOCHECK Function Blocks (template/FUNC_AUTOCHECK.xlsx)', () => {
+    it('should evaluate CHECKVALUE, CHECKAVG, CHECKCOUNT, FUNC_AVG, FUNC_OFFSET_AVGZERO, CHECKVALUE_PERIOD and CHECKAVG_PERIOD correctly', async () => {
+      const service = new TestingService();
+
+      const baseTime = Date.now() - 300000; // 5 mins ago
+      const packets = [
+        {
+          id: 'p-1',
+          network_id: '70B3D57ED0001111',
+          raw_payload: '0102',
+          f_port: 1,
+          f_cnt: 1,
+          received_at: new Date(baseTime).toISOString(),
+          decoded_payload: { temperature: 25.0, humidity: 60.0 },
+        },
+        {
+          id: 'p-2',
+          network_id: '70B3D57ED0001111',
+          raw_payload: '0102',
+          f_port: 1,
+          f_cnt: 2,
+          received_at: new Date(baseTime + 30000).toISOString(), // +30s
+          decoded_payload: { temperature: 25.4, humidity: 61.0 },
+        },
+        {
+          id: 'p-3',
+          network_id: '70B3D57ED0001111',
+          raw_payload: '0102',
+          f_port: 1,
+          f_cnt: 3,
+          received_at: new Date(baseTime + 60000).toISOString(), // +60s
+          decoded_payload: { temperature: 25.2, humidity: 59.5 },
+        },
+        {
+          id: 'p-4',
+          network_id: '70B3D57ED0001111',
+          raw_payload: '0102',
+          f_port: 1,
+          f_cnt: 4,
+          received_at: new Date(baseTime + 90000).toISOString(), // +90s
+          decoded_payload: { temperature: 25.6, humidity: 60.5 },
+        },
+      ];
+
+      const criteria = {
+        function_rules: [
+          // 1. CHECKVALUE: ALL values must be between 24.0 and 26.0
+          {
+            function_name: 'CHECKVALUE',
+            parameter_name: 'temperature',
+            low_threshold: 24.0,
+            high_threshold: 26.0,
+          },
+          // 2. CHECKAVG: Average temperature must be between 25.0 and 25.5
+          {
+            function_name: 'CHECKAVG',
+            parameter_name: 'temperature',
+            low_threshold: 25.0,
+            high_threshold: 25.5,
+          },
+          // 3. CHECKCOUNT: Temperature >= 25.3 at least 2 times, max 3 times
+          {
+            function_name: 'CHECKCOUNT',
+            parameter_name: 'temperature',
+            low_threshold: 25.3,
+            high_threshold: 26.0,
+            min_count: 2,
+            max_count: 3,
+          },
+          // 4. FUNC_AVG: Average humidity in first 70s
+          {
+            function_name: 'FUNC_AVG',
+            parameter_name: 'humidity',
+            start_time: 0,
+            duration: 70,
+          },
+          // 5. FUNC_OFFSET_AVGZERO: CONSTANT_B = STANDARD_ZERO (0) - AVG_ZERO(temperature during 0..70s)
+          {
+            function_name: 'FUNC_OFFSET_AVGZERO',
+            parameter_name: 'temperature',
+            standard_zero: 0,
+            start_offset_time: 0,
+            duration_offset_time: 70,
+          },
+          // 6. CHECKVALUE_PERIOD: In period 20s..70s (packets 2 & 3), temperature must be between 25.0 and 25.5
+          {
+            function_name: 'CHECKVALUE_PERIOD',
+            parameter_name: 'temperature',
+            period_start_offset_time: 20,
+            period_duration_time: 50,
+            low_threshold: 25.0,
+            high_threshold: 25.5,
+          },
+          // 7. CHECKAVG_PERIOD: In period 20s..70s, AVG(humidity) must be between 59.0 and 61.5
+          {
+            function_name: 'CHECKAVG_PERIOD',
+            parameter_name: 'humidity',
+            period_start_offset_time: 20,
+            period_duration_time: 50,
+            low_threshold: 59.0,
+            high_threshold: 61.5,
+          },
+        ],
+      };
+
+      const evalRes = await service.evaluateAutoCheck(
+        {
+          packets,
+          test_start_time: baseTime,
+        },
+        criteria
+      );
+
+      assert.strictEqual(evalRes.verdict, 'PASS');
+      assert.strictEqual(evalRes.total_rules, 7);
+      assert.strictEqual(evalRes.passed_rules, 7);
+
+      // Verify individual function rules
+      const r1 = evalRes.rule_results.find((r) => r.function_name === 'CHECKVALUE');
+      assert.ok(r1 && r1.passed);
+
+      const r2 = evalRes.rule_results.find((r) => r.function_name === 'CHECKAVG');
+      assert.ok(r2 && r2.passed);
+      assert.strictEqual(r2.calculated_value, 25.3);
+
+      const r3 = evalRes.rule_results.find((r) => r.function_name === 'CHECKCOUNT');
+      assert.ok(r3 && r3.passed);
+      assert.strictEqual(r3.calculated_value, 2);
+
+      const r4 = evalRes.rule_results.find((r) => r.function_name === 'FUNC_AVG');
+      assert.ok(r4 && r4.passed);
+      assert.strictEqual(r4.calculated_value, 60.167);
+
+      const r5 = evalRes.rule_results.find((r) => r.function_name === 'FUNC_OFFSET_AVGZERO');
+      assert.ok(r5 && r5.passed);
+      assert.strictEqual(r5.calculated_value, -25.2);
+      assert.ok(r5.hex_output);
+
+      const r6 = evalRes.rule_results.find((r) => r.function_name === 'CHECKVALUE_PERIOD');
+      assert.ok(r6 && r6.passed);
+
+      const r7 = evalRes.rule_results.find((r) => r.function_name === 'CHECKAVG_PERIOD');
+      assert.ok(r7 && r7.passed);
+      assert.strictEqual(r7.calculated_value, 60.25);
+    });
+  });
 });
 
 

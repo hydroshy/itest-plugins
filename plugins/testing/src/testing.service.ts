@@ -16,6 +16,8 @@ import {
   AutoCheckTarget,
   AutoCheckRuleResult,
   AutoCheckEvaluation,
+  AutoCheckFunctionRule,
+  AutoCheckFunctionName,
   DeviceTestSession,
   DeviceTestSessionStatus,
   CreateDeviceTestDTO,
@@ -560,8 +562,13 @@ export class TestingService {
     target: AutoCheckTarget,
     criteria?: AutoCheckCriteria
   ): Promise<AutoCheckEvaluation> {
-    const productRules = !!(criteria?.dut || criteria?.reference || criteria?.comparisons);
-    const rules = productRules ? criteria! : { ...this.getDefaultAutoCheckRules(), ...(criteria || {}) };
+    const hasCustomRules = !!(
+      criteria?.dut ||
+      criteria?.reference ||
+      criteria?.comparisons ||
+      (criteria?.function_rules && criteria.function_rules.length > 0)
+    );
+    const rules = hasCustomRules ? criteria! : { ...this.getDefaultAutoCheckRules(), ...(criteria || {}) };
     const newest = (packets: DevicePacketDTO[]) => [...packets].sort(
       (a, b) => new Date(b.received_at || 0).getTime() - new Date(a.received_at || 0).getTime()
     )[0];
@@ -734,6 +741,226 @@ export class TestingService {
           expected: rule,
           message: passed ? `Rule for '${field}' passed` : failReason,
         });
+      }
+    }
+
+    // --- STANDARD FUNC_AUTOCHECK EVALUATION (template/FUNC_AUTOCHECK.xlsx) ---
+    const funcRules: AutoCheckFunctionRule[] = [
+      ...(rules.function_rules || []),
+      ...(rules.dut?.function_rules || []),
+    ];
+
+    if (funcRules.length > 0) {
+      const dutPackets = target.packets && target.packets.length > 0 ? target.packets : [packet];
+      const startBaseline = target.test_start_time
+        ? new Date(target.test_start_time).getTime()
+        : dutPackets.length > 0
+        ? new Date(dutPackets[dutPackets.length - 1].received_at || 0).getTime()
+        : Date.now();
+
+      for (const fRule of funcRules) {
+        const param = fRule.parameter_name;
+        const fnName = fRule.function_name;
+
+        // Helper to extract param value from packet
+        const getVal = (p: DevicePacketDTO): number | null => {
+          const dec = p.decoded_payload || {};
+          const key = Object.keys(dec).find((k) => k.toLowerCase() === param.toLowerCase());
+          if (key && dec[key] != null && !isNaN(Number(dec[key]))) {
+            return Number(dec[key]);
+          }
+          if (param.toLowerCase() === 'rssi' && p.rf_info?.rssi != null) return Number(p.rf_info.rssi);
+          if (param.toLowerCase() === 'snr' && p.rf_info?.snr != null) return Number(p.rf_info.snr);
+          return null;
+        };
+
+        const getPacketTime = (p: DevicePacketDTO): number => {
+          return new Date(p.received_at || 0).getTime();
+        };
+
+        switch (fnName) {
+          case 'CHECKVALUE': {
+            // LOW_THRESHOLD <= UPLINK_PARAMETER <= HIGH_THRESHOLD ở all value trong khoảng thời gian test
+            const values = dutPackets.map(getVal).filter((v): v is number => v !== null);
+            const low = fRule.low_threshold ?? -Infinity;
+            const high = fRule.high_threshold ?? Infinity;
+            const passed = values.length > 0 && values.every((v) => v >= low && v <= high);
+            ruleResults.push({
+              rule: `CHECKVALUE_${param.toUpperCase()}`,
+              function_name: fnName,
+              passed,
+              actual: values.length > 0 ? (values.length === 1 ? values[0] : `[${values.join(', ')}]`) : 'NO_DATA',
+              expected: `${low} <= ${param} <= ${high}`,
+              message: passed
+                ? `Hàm CHECKVALUE(${param}) đạt chuẩn trên tất cả ${values.length} gói tin`
+                : `Hàm CHECKVALUE(${param}) không đạt ngưỡng [${low}, ${high}]`,
+            });
+            break;
+          }
+
+          case 'CHECKAVG': {
+            // LOW_THRESHOLD <= AVG(UPLINK_PARAMETER) <= HIGH_THRESHOLD
+            const values = dutPackets.map(getVal).filter((v): v is number => v !== null);
+            const avg = values.length > 0 ? +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(3) : null;
+            const low = fRule.low_threshold ?? -Infinity;
+            const high = fRule.high_threshold ?? Infinity;
+            const passed = avg !== null && avg >= low && avg <= high;
+            ruleResults.push({
+              rule: `CHECKAVG_${param.toUpperCase()}`,
+              function_name: fnName,
+              passed,
+              actual: avg !== null ? avg : 'NO_DATA',
+              expected: `${low} <= AVG(${param}) <= ${high}`,
+              calculated_value: avg !== null ? avg : undefined,
+              message: passed
+                ? `Hàm CHECKAVG(${param}) = ${avg} đạt trong ngưỡng [${low}, ${high}]`
+                : `Hàm CHECKAVG(${param}) = ${avg} ngoài ngưỡng [${low}, ${high}]`,
+            });
+            break;
+          }
+
+          case 'CHECKCOUNT': {
+            // Counter tăng khi LOW <= PARAM <= HIGH. Đạt khi MIN_COUNT <= counter <= MAX_COUNT
+            const values = dutPackets.map(getVal).filter((v): v is number => v !== null);
+            const low = fRule.low_threshold ?? -Infinity;
+            const high = fRule.high_threshold ?? Infinity;
+            const count = values.filter((v) => v >= low && v <= high).length;
+            const minC = fRule.min_count ?? 1;
+            const maxC = fRule.max_count ?? Infinity;
+            const passed = count >= minC && count <= maxC;
+            ruleResults.push({
+              rule: `CHECKCOUNT_${param.toUpperCase()}`,
+              function_name: fnName,
+              passed,
+              actual: count,
+              expected: `${minC} <= count <= ${maxC} (ngưỡng [${low}, ${high}])`,
+              calculated_value: count,
+              message: passed
+                ? `Hàm CHECKCOUNT(${param}) = ${count} đạt trong khoảng [${minC}, ${maxC}]`
+                : `Hàm CHECKCOUNT(${param}) = ${count} không đạt [${minC}, ${maxC}]`,
+            });
+            break;
+          }
+
+          case 'FUNC_AVG': {
+            // AVG of UPLINK_PARAMETER during DURATION since START_TIME
+            const startOffsetSec = typeof fRule.start_time === 'number' ? fRule.start_time : 0;
+            const durSec = fRule.duration ?? 300;
+            const windowStart = startBaseline + startOffsetSec * 1000;
+            const windowEnd = windowStart + durSec * 1000;
+
+            const inWindow = dutPackets.filter((p) => {
+              const t = getPacketTime(p);
+              return t >= windowStart && t <= windowEnd;
+            });
+            const values = inWindow.map(getVal).filter((v): v is number => v !== null);
+            const avg = values.length > 0 ? +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(3) : 0;
+            ruleResults.push({
+              rule: `FUNC_AVG_${param.toUpperCase()}`,
+              function_name: fnName,
+              passed: values.length > 0,
+              actual: avg,
+              expected: `AVG in duration ${durSec}s`,
+              calculated_value: avg,
+              message: `Tính AVG(${param}) = ${avg} trong khoảng thời lượng ${durSec}s (${values.length} gói tin)`,
+            });
+            break;
+          }
+
+          case 'FUNC_OFFSET_AVGZERO': {
+            // CONSTANT_B = STANDARD_ZERO - (AVG_ZERO during DURATION_FOR_AVG_ZERO since START_OFFSET_TIME)
+            const startOffsetSec = fRule.start_offset_time ?? 0;
+            const durSec = fRule.duration_offset_time ?? 60;
+            const stdZero = fRule.standard_zero ?? 0;
+            const windowStart = startBaseline + startOffsetSec * 1000;
+            const windowEnd = windowStart + durSec * 1000;
+
+            const inWindow = dutPackets.filter((p) => {
+              const t = getPacketTime(p);
+              return t >= windowStart && t <= windowEnd;
+            });
+            const values = inWindow.map(getVal).filter((v): v is number => v !== null);
+            const avgZero = values.length > 0 ? +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(4) : 0;
+            const constantB = +(stdZero - avgZero).toFixed(4);
+
+            // Chuyển constantB sang định dạng HEX (IEEE-754 32-bit float hex hoặc int16 hex)
+            const buf = Buffer.alloc(4);
+            buf.writeFloatBE(constantB, 0);
+            const hexFormat = buf.toString('hex').toUpperCase();
+
+            ruleResults.push({
+              rule: `FUNC_OFFSET_AVGZERO_${param.toUpperCase()}`,
+              function_name: fnName,
+              passed: values.length > 0,
+              actual: constantB,
+              expected: `CONSTANT_B = ${stdZero} - AVG_ZERO`,
+              calculated_value: constantB,
+              hex_output: hexFormat,
+              message: `Đã tính CONSTANT_B = ${constantB} (HEX: 0x${hexFormat}), AVG_ZERO = ${avgZero}`,
+            });
+            break;
+          }
+
+          case 'CHECKVALUE_PERIOD': {
+            // LOW_THRESHOLD <= UPLINK_PARAMETER <= HIGH_THRESHOLD trong chu kỳ PERIOD_START_OFFSET_TIME -> + PERIOD_DURATION_TIME
+            const startOffsetSec = fRule.period_start_offset_time ?? 0;
+            const durSec = fRule.period_duration_time ?? 60;
+            const windowStart = startBaseline + startOffsetSec * 1000;
+            const windowEnd = windowStart + durSec * 1000;
+
+            const inWindow = dutPackets.filter((p) => {
+              const t = getPacketTime(p);
+              return t >= windowStart && t <= windowEnd;
+            });
+            const values = inWindow.map(getVal).filter((v): v is number => v !== null);
+            const low = fRule.low_threshold ?? -Infinity;
+            const high = fRule.high_threshold ?? Infinity;
+            const passed = values.length > 0 && values.every((v) => v >= low && v <= high);
+
+            ruleResults.push({
+              rule: `CHECKVALUE_PERIOD_${param.toUpperCase()}`,
+              function_name: fnName,
+              passed,
+              actual: values.length > 0 ? (values.length === 1 ? values[0] : `[${values.join(', ')}]`) : 'NO_DATA_IN_PERIOD',
+              expected: `${low} <= ${param} <= ${high} (trong chu kỳ +${startOffsetSec}s đến +${startOffsetSec + durSec}s)`,
+              message: passed
+                ? `CHECKVALUE_PERIOD(${param}) đạt chuẩn trong chu kỳ ${durSec}s`
+                : `CHECKVALUE_PERIOD(${param}) không đạt ngưỡng trong chu kỳ xác định`,
+            });
+            break;
+          }
+
+          case 'CHECKAVG_PERIOD': {
+            // LOW_THRESHOLD <= AVG(UPLINK_PARAMETER) <= HIGH_THRESHOLD trong chu kỳ PERIOD_START_OFFSET_TIME -> + PERIOD_DURATION_TIME
+            const startOffsetSec = fRule.period_start_offset_time ?? 0;
+            const durSec = fRule.period_duration_time ?? 60;
+            const windowStart = startBaseline + startOffsetSec * 1000;
+            const windowEnd = windowStart + durSec * 1000;
+
+            const inWindow = dutPackets.filter((p) => {
+              const t = getPacketTime(p);
+              return t >= windowStart && t <= windowEnd;
+            });
+            const values = inWindow.map(getVal).filter((v): v is number => v !== null);
+            const avg = values.length > 0 ? +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(3) : null;
+            const low = fRule.low_threshold ?? -Infinity;
+            const high = fRule.high_threshold ?? Infinity;
+            const passed = avg !== null && avg >= low && avg <= high;
+
+            ruleResults.push({
+              rule: `CHECKAVG_PERIOD_${param.toUpperCase()}`,
+              function_name: fnName,
+              passed,
+              actual: avg !== null ? avg : 'NO_DATA_IN_PERIOD',
+              expected: `${low} <= AVG(${param}) <= ${high} (trong chu kỳ +${startOffsetSec}s đến +${startOffsetSec + durSec}s)`,
+              calculated_value: avg !== null ? avg : undefined,
+              message: passed
+                ? `CHECKAVG_PERIOD(${param}) = ${avg} đạt chuẩn trong chu kỳ ${durSec}s`
+                : `CHECKAVG_PERIOD(${param}) = ${avg} không đạt chuẩn trong chu kỳ xác định`,
+            });
+            break;
+          }
+        }
       }
     }
 
