@@ -13,6 +13,7 @@ import {
   DeviceSimulationProfile,
   DeviceSimulationResult,
   AutoCheckCriteria,
+  AutoCheckTarget,
   AutoCheckRuleResult,
   AutoCheckEvaluation,
   DeviceTestSession,
@@ -551,16 +552,15 @@ export class TestingService {
   }
 
   async evaluateAutoCheck(
-    target: {
-      packet?: DevicePacketDTO;
-      packet_id?: string;
-      dev_eui?: string;
-      serial_number?: string;
-    },
+    target: AutoCheckTarget,
     criteria?: AutoCheckCriteria
   ): Promise<AutoCheckEvaluation> {
-    const rules = { ...this.getDefaultAutoCheckRules(), ...(criteria || {}) };
-    let packet: DevicePacketDTO | undefined = target.packet;
+    const productRules = !!(criteria?.dut || criteria?.reference || criteria?.comparisons);
+    const rules = productRules ? criteria! : { ...this.getDefaultAutoCheckRules(), ...(criteria || {}) };
+    const newest = (packets: DevicePacketDTO[]) => [...packets].sort(
+      (a, b) => new Date(b.received_at || 0).getTime() - new Date(a.received_at || 0).getTime()
+    )[0];
+    let packet: DevicePacketDTO | undefined = target.packet || newest(target.packets || []);
 
     if (!packet && target.packet_id) {
       packet = this.packets.find((p) => p.id === target.packet_id);
@@ -591,6 +591,50 @@ export class TestingService {
     }
 
     const ruleResults: AutoCheckRuleResult[] = [];
+    const samples = target.packets || [packet];
+    const references = target.reference_packets || [];
+    for (const [side, config, packets] of [
+      ['dut', rules.dut, samples],
+      ['reference', rules.reference, references],
+    ] as const) {
+      if (!config) continue;
+      if (!config.item_code?.trim() || !config.fw_version?.trim() || !config.rules?.length) {
+        throw new Error(`${side}: product and at least one field rule are required`);
+      }
+      if (new Set(packets.map(p => p.network_id?.toUpperCase())).size > 1) {
+        throw new Error(`${side}: samples must belong to one device`);
+      }
+      for (const rule of config.rules) {
+        if (!rule.field?.trim() || !Number.isInteger(rule.count) || rule.count < 1 ||
+          (rule.min !== undefined && !Number.isFinite(rule.min)) ||
+          (rule.max !== undefined && !Number.isFinite(rule.max)) ||
+          (rule.min !== undefined && rule.max !== undefined && rule.min > rule.max)) {
+          throw new Error(`${side}: invalid field/count/range`);
+        }
+        const count = packets.filter(p => {
+          const value = p.decoded_payload?.[rule.field];
+          return value !== undefined && value !== null &&
+            (rule.equals === undefined || value === rule.equals) &&
+            (rule.min === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= rule.min)) &&
+            (rule.max === undefined || (typeof value === 'number' && Number.isFinite(value) && value <= rule.max));
+        }).length;
+        ruleResults.push({ rule: `${side.toUpperCase()}_${rule.field}`, passed: count >= rule.count,
+          actual: count, expected: rule.count, message: 'Number of samples satisfying field conditions' });
+      }
+    }
+    for (const comparison of rules.comparisons || []) {
+      if (!comparison.dut_field?.trim() || !comparison.reference_field?.trim() ||
+        !Number.isFinite(comparison.tolerance) || comparison.tolerance < 0) {
+        throw new Error('Invalid comparison fields or tolerance');
+      }
+      const actual = newest(samples)?.decoded_payload?.[comparison.dut_field];
+      const expected = newest(references)?.decoded_payload?.[comparison.reference_field];
+      const passed = typeof actual === 'number' && Number.isFinite(actual) &&
+        typeof expected === 'number' && Number.isFinite(expected) &&
+        Math.abs(actual - expected) <= comparison.tolerance;
+      ruleResults.push({ rule: `COMPARE_${comparison.dut_field}`, passed, actual, expected,
+        message: `Absolute difference must be <= ${comparison.tolerance}` });
+    }
 
     // Rule 1: RSSI Signal Range
     const rssi = packet.rf_info?.rssi;

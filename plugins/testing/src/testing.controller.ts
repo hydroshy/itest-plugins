@@ -1,6 +1,7 @@
 import { TestingService } from './testing.service';
 import {
   AutoCheckCriteria,
+  AutoCheckTarget,
   CreateDeviceTestDTO,
   DeviceFilterQuery,
   DeviceRegistrationDTO,
@@ -196,7 +197,7 @@ export class TestingController {
   }
 
   async evaluateAutoCheck(payload: {
-    target: { packet?: any; packet_id?: string; dev_eui?: string; serial_number?: string };
+    target: AutoCheckTarget;
     criteria?: AutoCheckCriteria;
   }) {
     const result = await this.service.evaluateAutoCheck(payload.target, payload.criteria);

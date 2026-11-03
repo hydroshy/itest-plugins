@@ -255,7 +255,33 @@ export interface DeviceSimulationResult {
   completed_at?: Date | string;
 }
 
+export interface AutoCheckFieldRule {
+  field: string;
+  count: number;
+  min?: number;
+  max?: number;
+  equals?: string | number | boolean | null;
+}
+
+export interface AutoCheckDeviceCriteria {
+  item_code: string;
+  fw_version: string;
+  rules: AutoCheckFieldRule[];
+}
+
+export interface AutoCheckTarget {
+  packet?: DevicePacketDTO;
+  packet_id?: string;
+  dev_eui?: string;
+  serial_number?: string;
+  packets?: DevicePacketDTO[];
+  reference_packets?: DevicePacketDTO[];
+}
+
 export interface AutoCheckCriteria {
+  dut?: AutoCheckDeviceCriteria;
+  reference?: AutoCheckDeviceCriteria;
+  comparisons?: { dut_field: string; reference_field: string; tolerance: number }[];
   min_rssi?: number;
   max_rssi?: number;
   min_snr?: number;
