@@ -358,6 +358,7 @@ export interface DeviceTestingListItem {
   serial_number: string;
   item_code: string;
   fw_version?: string;
+  long_fw?: string;
   hw_version?: string;
   fw_code?: string;
   me_version?: string;

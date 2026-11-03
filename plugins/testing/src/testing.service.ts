@@ -821,6 +821,12 @@ export class TestingService {
     if (!item.created_at) {
       item.created_at = new Date().toISOString();
     }
+    if (!item.long_fw && item.fw_version) {
+      item.long_fw = item.fw_version;
+    }
+    if (!item.fw_version && item.long_fw) {
+      item.fw_version = item.long_fw;
+    }
     this.deviceTestingItems.set(item.id, item);
     return item;
   }
