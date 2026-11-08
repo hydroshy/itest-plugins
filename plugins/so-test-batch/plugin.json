@@ -1,0 +1,40 @@
+{
+  "id": "so-test-batch",
+  "name": "SO Test Batch",
+  "version": "1.0.0",
+  "sdkVersion": "^1.0.0",
+  "type": "HYBRID",
+  "description": "Quản lý liên kết giữa Sale Order (SO) và Device Test Batch, theo dõi danh sách Test Batch theo từng SO, thực hiện gán và hủy liên kết Test Batch thực tế.",
+  "author": "ITEST Platform Team",
+  "entry": "dist/index.js",
+  "enabledByDefault": true,
+  "permissions": [
+    {
+      "namespace": "testing",
+      "resource": "so_test_batch",
+      "action": "view"
+    },
+    {
+      "namespace": "testing",
+      "resource": "so_test_batch",
+      "action": "manage"
+    },
+    {
+      "namespace": "traceability",
+      "resource": "so",
+      "action": "read"
+    },
+    {
+      "namespace": "testing",
+      "resource": "test-batch",
+      "action": "view"
+    }
+  ],
+  "ui": {
+    "title": "SO Test Batch",
+    "icon": "Layers",
+    "route": "/plugins/so-test-batch",
+    "component": "SoTestBatchView",
+    "slot": "main-navigation"
+  }
+}

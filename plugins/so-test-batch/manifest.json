@@ -1,0 +1,23 @@
+{
+  "id": "so-test-batch",
+  "name": "SO Test Batch Plugin",
+  "version": "1.0.0",
+  "type": "APPLICATION",
+  "description": "Quản lý liên kết giữa Sale Order (SO) và Device Test Batch, theo dõi danh sách Test Batch theo từng SO, thực hiện gán và hủy liên kết Test Batch thực tế.",
+  "author": "ITEST Platform Team",
+  "license": "UNLICENSED",
+  "entry": "dist/index.js",
+  "database": {
+    "schemaName": "system_schema",
+    "tables": [
+      "so_test_batches",
+      "v_so_with_test_batches",
+      "v_available_test_batches"
+    ]
+  },
+  "capabilities": {
+    "soBatchLinking": true,
+    "batchManagement": true,
+    "quickFilter": true
+  }
+}

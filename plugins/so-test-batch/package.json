@@ -1,0 +1,14 @@
+{
+  "name": "@universal-iot/plugin-so-test-batch",
+  "version": "1.0.0",
+  "description": "Quản lý liên kết giữa Sale Order (SO) và Test Batch, tra cứu và liên kết dữ liệu thực tế giữa Traceability và Testing Subsystems",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/so-test-batch.spec.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
