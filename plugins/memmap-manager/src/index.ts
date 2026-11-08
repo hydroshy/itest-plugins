@@ -55,6 +55,8 @@ export interface MemmapProfileInput {
   id?: string;
   name: string;
   description?: string;
+  itemCode?: string;
+  fwVersion?: string;
   sku?: string;
   longFw?: string;
   shortFw?: string;
@@ -65,6 +67,8 @@ export interface MemmapProfileInput {
   sourceFormat: MemmapSourceFormat;
   registers: MemmapRegister[];
 }
+
+export const FW_VERSION_REGEX = /^[0-9]F[0-9]{4}$/;
 
 export interface MemmapImportError {
   row?: number;
@@ -120,7 +124,7 @@ export class MemmapManagerService {
     };
   }
 
-  private validateProfile(candidate: unknown, sourceFormat: MemmapSourceFormat): MemmapPreviewResult {
+  public validateProfile(candidate: unknown, sourceFormat: MemmapSourceFormat): MemmapPreviewResult {
     const errors: MemmapImportError[] = [];
     const source = this.asRecord(candidate);
     const suppliedRegisters = Array.isArray(source?.registers)
@@ -136,17 +140,28 @@ export class MemmapManagerService {
     const name = this.asString(source.name);
     if (!name) errors.push({ field: 'name', message: 'Profile name is required' });
 
+    const itemCode = this.asString(source.itemCode ?? source.item_code ?? source.ITEM_CODE);
+    const fwVersion = this.asString(source.fwVersion ?? source.fw_version ?? source.FW_VERSION);
+    if (fwVersion && !FW_VERSION_REGEX.test(fwVersion)) {
+      errors.push({ field: 'fwVersion', message: 'FW_VERSION must match format XFXXXX (X is a digit, e.g. 1F0001)' });
+    }
+
     const registers: MemmapRegister[] = [];
     const addresses = new Set<number>();
     suppliedRegisters.forEach((value, index) => {
-      const register = this.validateRegister(value, index + 1, errors);
-      if (!register) return;
-      if (addresses.has(register.address)) {
-        errors.push({ row: index + 1, field: 'address', message: 'Register address must be unique within a profile' });
-        return;
+      const rec = this.asRecord(value);
+      const rawAddress = this.asOptionalFiniteNumber(rec?.address ?? rec?.['Modbus Register (Decimal)']);
+      if (rawAddress !== undefined) {
+        if (addresses.has(rawAddress)) {
+          errors.push({ row: index + 1, field: 'address', message: 'Duplicate address: register address must be unique within a profile' });
+        } else {
+          addresses.add(rawAddress);
+        }
       }
-      addresses.add(register.address);
-      registers.push(register);
+      const register = this.validateRegister(value, index + 1, errors);
+      if (register) {
+        registers.push(register);
+      }
     });
 
     if (suppliedRegisters.length === 0) errors.push({ field: 'registers', message: 'At least one register is required' });
@@ -158,6 +173,8 @@ export class MemmapManagerService {
         id: this.asString(source.id),
         name,
         description: this.asString(source.description),
+        itemCode,
+        fwVersion,
         sku: this.asString(source.sku),
         longFw: this.asString(source.longFw),
         shortFw: this.asString(source.shortFw),
@@ -301,13 +318,36 @@ export class MemmapManagerService {
       return { name: 'Imported MemMap', sourceFormat: 'csv', registers };
     }
 
-    const allowed = new Set(['profileName', 'name', 'description', 'address', 'dataType', 'format', 'scale', 'offset', 'unit', 'defaultValue', 'accessMode']);
+    const allowed = new Set([
+      'profileName',
+      'name',
+      'description',
+      'itemCode',
+      'item_code',
+      'ITEM_CODE',
+      'fwVersion',
+      'fw_version',
+      'FW_VERSION',
+      'sku',
+      'longFw',
+      'shortFw',
+      'address',
+      'dataType',
+      'format',
+      'scale',
+      'offset',
+      'unit',
+      'defaultValue',
+      'accessMode',
+    ]);
     if (!headers.includes('name') || !headers.includes('address') || !(headers.includes('dataType') || headers.includes('format')) || !headers.every((header) => allowed.has(header))) {
       throw new Error('CSV header must include compact MemMap columns or IEC485 Modbus columns');
     }
     const profileName = mappedRows[0]?.profileName?.trim() || 'Imported MemMap';
     const description = mappedRows[0]?.description?.trim() || undefined;
-    return { name: profileName, description, registers: mappedRows };
+    const itemCode = mappedRows[0]?.itemCode || mappedRows[0]?.item_code || mappedRows[0]?.ITEM_CODE || undefined;
+    const fwVersion = mappedRows[0]?.fwVersion || mappedRows[0]?.fw_version || mappedRows[0]?.FW_VERSION || undefined;
+    return { name: profileName, description, itemCode, fwVersion, registers: mappedRows };
   }
 
   private mapLegacyIec485Register(row: Record<string, string>, previous?: Record<string, string>): Record<string, unknown> {
