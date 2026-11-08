@@ -114,6 +114,8 @@ export interface MemmapProfileSummary {
   sku: string;
   long_fw: string;
   short_fw?: string;
+  item_code?: string;
+  fw_version?: string;
   has_decoder?: boolean;
   decoder_id?: string;
   decoder_name?: string;

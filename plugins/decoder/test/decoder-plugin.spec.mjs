@@ -397,5 +397,38 @@ describe('LoRaWAN & IoT Payload Decoder Plugin Test Suite', () => {
       assert.strictEqual(decodeRes.data.matchTier, 'exact_full');
       assert.strictEqual(decodeRes.data.data.FW_VERSION, 3);
     });
+
+    it('should validate and register decoder script using ITEM_CODE and FW_VERSION (XFXXXX) without SKU', async () => {
+      const service = new DecoderService();
+      const controller = new DecoderController(service);
+
+      // Rejects invalid FW_VERSION format (not XFXXXX)
+      const invalidRes = await controller.createScript({
+        name: 'Invalid FW Decoder',
+        item_code: 'WSLRW-UL-01',
+        fw_version: 'INVALID-FW',
+        script: LoRaWANScriptRunner.getDefaultTemplate(),
+      });
+      assert.strictEqual(invalidRes.success, false);
+      assert(invalidRes.error.includes('XFXXXX'));
+
+      // Successfully registers with valid ITEM_CODE and FW_VERSION (0F0001)
+      const validRes = await controller.createScript({
+        name: 'MEMMAP Aligned Decoder',
+        item_code: 'WSLRW-UL-01',
+        fw_version: '0F0001',
+        script: LoRaWANScriptRunner.getDefaultTemplate(),
+      });
+      assert.strictEqual(validRes.success, true);
+      assert.strictEqual(validRes.data.item_code, 'WSLRW-UL-01');
+
+      // Resolves by item_code and fw_version
+      const resolveRes = await controller.resolveForDevice({
+        item_code: 'WSLRW-UL-01',
+        fw_version: '0F0001',
+      });
+      assert.strictEqual(resolveRes.success, true);
+      assert.strictEqual(resolveRes.matchTier, 'item_code_fw_ver');
+    });
   });
 });

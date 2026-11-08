@@ -722,6 +722,139 @@ export interface ChirpStackHttpIntegrationSetupDTO {
   headers?: Record<string, string>;
 }
 
+// ============================================================================
+// SIMULATION FLOW FUNCTION BLOCKS (3 Standard Functions: Downlink, Clear, Delay)
+// ============================================================================
+
+export type SimulationFunctionType = 'downlink' | 'clear_downlink' | 'delay';
+export type SimulationTargetDevice = 'DUT' | 'REF';
+
+export interface BaseSimulationBlock {
+  id?: string;
+  step?: number;
+  name?: string;
+  functionType: SimulationFunctionType;
+}
+
+export interface DownlinkSimulationBlock extends BaseSimulationBlock {
+  functionType: 'downlink';
+  targetDevice: SimulationTargetDevice;
+  fPort: number; // default 1
+  payloadHex: string;
+  isConfirmed?: boolean;
+}
+
+export interface ClearDownlinkSimulationBlock extends BaseSimulationBlock {
+  functionType: 'clear_downlink'; // FlushQueue on ChirpStack
+  targetDevice: SimulationTargetDevice;
+}
+
+export interface DelaySimulationBlock extends BaseSimulationBlock {
+  functionType: 'delay';
+  delaySeconds: number; // Duration of delay in seconds
+}
+
+export type SimulationFlowBlock =
+  | DownlinkSimulationBlock
+  | ClearDownlinkSimulationBlock
+  | DelaySimulationBlock;
+
+/**
+ * Calculates total duration of a flow simulation in seconds.
+ * Rules:
+ * - Total duration equals sum of all 'delay' blocks.
+ * - 'downlink' and 'clear_downlink' blocks take 0 seconds of delay.
+ */
+export function calculateFlowDurationSeconds(blocks: (SimulationFlowBlock | any)[]): number {
+  if (!Array.isArray(blocks)) return 0;
+  return blocks.reduce((acc, b) => {
+    if (!b) return acc;
+    const fType = b.functionType || b.function_type;
+    if (fType === 'delay') {
+      const delay = Number(b.delaySeconds ?? b.delay_seconds ?? b.duration ?? 0);
+      return acc + (isNaN(delay) || delay < 0 ? 0 : Math.round(delay));
+    }
+    return acc;
+  }, 0);
+}
+
+/**
+ * Determines whether a flow simulation requires a reference device (REF).
+ * If any block targets 'REF', the flow requires a golden reference device in Test Batch.
+ */
+export function flowRequiresReferenceDevice(blocks: (SimulationFlowBlock | any)[]): boolean {
+  if (!Array.isArray(blocks)) return false;
+  return blocks.some((b) => {
+    if (!b) return false;
+    const target = (b.targetDevice || b.target_device || '').toUpperCase();
+    return target === 'REF';
+  });
+}
+
+/**
+ * Validates 3 standard function blocks according to specification:
+ * 1. Downlink: targetDevice in ['DUT', 'REF'], fPort default 1 (valid port 1..223), payloadHex valid hex.
+ * 2. Clear downlink: targetDevice in ['DUT', 'REF'].
+ * 3. Delay: delaySeconds > 0.
+ */
+export function validateSimulationFlowBlocks(blocks: (SimulationFlowBlock | any)[]): {
+  valid: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+  if (!Array.isArray(blocks)) {
+    return { valid: false, errors: ['Blocks phải là một mảng'] };
+  }
+  if (blocks.length === 0) {
+    return { valid: false, errors: ['Flow simulation phải có ít nhất 1 function block'] };
+  }
+
+  blocks.forEach((b, index) => {
+    const step = index + 1;
+    if (!b || typeof b !== 'object') {
+      errors.push(`Block #${step}: Dữ liệu block không hợp lệ`);
+      return;
+    }
+    const fType = b.functionType || b.function_type;
+    if (!fType || !['downlink', 'clear_downlink', 'delay'].includes(fType)) {
+      errors.push(`Block #${step}: Function type '${fType}' không hợp lệ (chỉ chấp nhận 'downlink', 'clear_downlink', 'delay')`);
+      return;
+    }
+
+    if (fType === 'downlink') {
+      const target = (b.targetDevice || b.target_device || '').toUpperCase();
+      if (!['DUT', 'REF'].includes(target)) {
+        errors.push(`Block #${step} (Downlink): Thiết bị mục tiêu phải là 'DUT' hoặc 'REF' (nhận được: '${target}')`);
+      }
+      const port = Number(b.fPort ?? b.f_port ?? 1);
+      if (isNaN(port) || port < 1 || port > 223) {
+        errors.push(`Block #${step} (Downlink): fPort phải nằm trong khoảng 1..223 (nhận được: ${port})`);
+      }
+      const hex = (b.payloadHex || b.payload_hex || '').trim();
+      if (!hex) {
+        errors.push(`Block #${step} (Downlink): Payload Hex không được để trống`);
+      } else if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length % 2 !== 0) {
+        errors.push(`Block #${step} (Downlink): Payload Hex '${hex}' không đúng định dạng hex chẵn byte`);
+      }
+    } else if (fType === 'clear_downlink') {
+      const target = (b.targetDevice || b.target_device || '').toUpperCase();
+      if (!['DUT', 'REF'].includes(target)) {
+        errors.push(`Block #${step} (Clear Downlink): Thiết bị mục tiêu phải là 'DUT' hoặc 'REF' (nhận được: '${target}')`);
+      }
+    } else if (fType === 'delay') {
+      const delay = Number(b.delaySeconds ?? b.delay_seconds ?? 0);
+      if (isNaN(delay) || delay <= 0) {
+        errors.push(`Block #${step} (Delay): Thời gian delay phải lớn hơn 0 giây (nhận được: ${delay})`);
+      }
+    }
+  });
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
 
 
 

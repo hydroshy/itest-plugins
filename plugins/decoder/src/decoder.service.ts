@@ -14,6 +14,8 @@ import {
 import { LoRaWANScriptRunner } from './lorawan-script-runner';
 import { DefaultMemmapBridge, IMemmapBridge } from './decoder-memmap.bridge';
 
+export const FW_VERSION_REGEX = /^[0-9]F[0-9]{4}$/;
+
 export class DecoderService {
   private scripts: Map<string, DecoderScript> = new Map();
   // Lookup index by SKU::LONG_FW
@@ -36,14 +38,22 @@ export class DecoderService {
    * Register a new decoder script mapped to (sku, long_fw) and optional (item_code, fw_code)
    */
   async registerScript(dto: CreateDecoderScriptDto): Promise<DecoderScript> {
-    const sku = (dto.sku || dto.fw_code || dto.item_code || '').trim();
-    const longFw = (dto.long_fw || dto.fw_version || '').trim();
+    const rawFwVer = (dto.fw_version || '').trim();
+    if (rawFwVer && (rawFwVer.includes('F') || rawFwVer.length > 2)) {
+      if (!FW_VERSION_REGEX.test(rawFwVer)) {
+        throw new Error(`Định dạng FW_VERSION không hợp lệ: '${rawFwVer}'. Định dạng chuẩn là XFXXXX (X là số, ví dụ 0F0001).`);
+      }
+    }
+
+    const itemCode = (dto.item_code || '').trim();
+    const sku = (dto.sku || itemCode || dto.fw_code || '').trim();
+    const longFw = (dto.long_fw || rawFwVer || dto.fw_code || '').trim();
 
     if (!sku) {
-      throw new Error('SKU (or FW_CODE / ITEM_CODE) is required.');
+      throw new Error('ITEM_CODE (hoặc SKU / FW_CODE) là bắt buộc.');
     }
     if (!longFw) {
-      throw new Error('LONG_FW (or FW_VERSION) is required.');
+      throw new Error('FW_VERSION (hoặc LONG_FW) là bắt buộc.');
     }
     if (!dto.script || !dto.script.trim()) {
       throw new Error('Decoder script content is required.');
@@ -240,8 +250,7 @@ export class DecoderService {
     if (itemCode && fwVer) {
       const match = all.find(
         s =>
-          ((s.item_code || '').trim().toUpperCase() === itemCode ||
-            (s.sku || '').trim().toUpperCase() === itemCode) &&
+          ((s.item_code || '').trim().toUpperCase() === itemCode || (s.sku || '').trim().toUpperCase() === itemCode) &&
           ((s.long_fw || '').trim().toUpperCase() === fwVer ||
             (s.fw_version || '').trim().toUpperCase() === fwVer)
       );

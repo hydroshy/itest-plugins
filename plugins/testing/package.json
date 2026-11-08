@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --test test/testing-plugin.spec.mjs"
+    "test": "node --test test/testing-plugin.spec.mjs test/simulation-flow-blocks.spec.mjs"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
