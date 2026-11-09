@@ -4,6 +4,7 @@ import {
   calculateFlowDurationSeconds,
   flowRequiresReferenceDevice,
   validateSimulationFlowBlocks,
+  calculateLinearCoefficients,
 } from '../dist/index.js';
 
 describe('Simulation Flow 3 Standard Blocks (Downlink, Clear Downlink, Delay)', () => {
@@ -155,6 +156,58 @@ describe('Simulation Flow 3 Standard Blocks (Downlink, Clear Downlink, Delay)', 
       ];
 
       assert.strictEqual(flowRequiresReferenceDevice(blocks), true);
+    });
+  });
+
+  describe('4. Two-Point Calibration Function Blocks & Calculations', () => {
+    it('should validate full calibration flow blocks without errors', () => {
+      const calibBlocks = [
+        { functionType: 'downlink', targetDevice: 'SIMULATOR', fPort: 1, payloadHex: '00' },
+        { functionType: 'delay', delaySeconds: 120 },
+        { functionType: 'start_measurement', windowId: 'win_0ppm', targetDevice: 'DUT' },
+        { functionType: 'delay', delaySeconds: 480 },
+        { functionType: 'stop_measurement', windowId: 'win_0ppm' },
+        { functionType: 'average', windowId: 'win_0ppm', targetDevice: 'DUT', metric: 'raw_val', outputVar: 'x1' },
+        { functionType: 'downlink', targetDevice: 'SIMULATOR', fPort: 1, payloadHex: '14' },
+        { functionType: 'delay', delaySeconds: 120 },
+        { functionType: 'start_measurement', windowId: 'win_20ppm', targetDevice: 'DUT' },
+        { functionType: 'delay', delaySeconds: 480 },
+        { functionType: 'stop_measurement', windowId: 'win_20ppm' },
+        { functionType: 'average', windowId: 'win_20ppm', targetDevice: 'DUT', metric: 'raw_val', outputVar: 'x2' },
+        {
+          functionType: 'calculate_linear',
+          point1: { x: '{{x1}}', y: 0 },
+          point2: { x: '{{x2}}', y: 20 },
+        },
+        { functionType: 'downlink', targetDevice: 'DUT', fPort: 2, payloadHex: '{{calib_payload_hex}}' },
+        { functionType: 'device_auto_check' },
+      ];
+
+      const res = validateSimulationFlowBlocks(calibBlocks);
+      assert.strictEqual(res.valid, true);
+      assert.strictEqual(res.errors.length, 0);
+
+      // Duration: 120 + 480 + 120 + 480 = 1200s (20 minutes)
+      const duration = calculateFlowDurationSeconds(calibBlocks);
+      assert.strictEqual(duration, 1200);
+    });
+
+    it('should correctly calculate linear coefficients y = a*x + b and encode IEEE-754 hex', () => {
+      // Point 1: raw x1 = 100, standard y1 = 0 ppm
+      // Point 2: raw x2 = 500, standard y2 = 20 ppm
+      // a = (20 - 0) / (500 - 100) = 20 / 400 = 0.05
+      // b = 0 - 0.05 * 100 = -5.0
+      const res = calculateLinearCoefficients({ x: 100, y: 0 }, { x: 500, y: 20 });
+      assert.strictEqual(res.valid, true);
+      assert.strictEqual(res.a, 0.05);
+      assert.strictEqual(res.b, -5);
+      assert.strictEqual(res.aHex.length, 8);
+      assert.strictEqual(res.bHex.length, 8);
+
+      // Point with deltaX near zero should be rejected safely
+      const failRes = calculateLinearCoefficients({ x: 100, y: 0 }, { x: 100.00001, y: 20 });
+      assert.strictEqual(failRes.valid, false);
+      assert.ok(failRes.error);
     });
   });
 });

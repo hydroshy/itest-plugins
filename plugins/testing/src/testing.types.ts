@@ -262,11 +262,13 @@ export type AutoCheckFunctionName =
   | 'FUNC_AVG'
   | 'FUNC_OFFSET_AVGZERO'
   | 'CHECKVALUE_PERIOD'
-  | 'CHECKAVG_PERIOD';
+  | 'CHECKAVG_PERIOD'
+  | 'MEASUREMENT_WINDOW'
+  | 'CALC_AVERAGE';
 
 export interface AutoCheckFunctionRule {
   function_name: AutoCheckFunctionName;
-  target?: 'dut' | 'reference' | 'both';
+  target?: 'dut' | 'reference' | 'simulator' | 'both';
   parameter_name: string;
   low_threshold?: number;
   high_threshold?: number;
@@ -280,6 +282,11 @@ export interface AutoCheckFunctionRule {
   period_start_offset_time?: number;
   period_duration_time?: number;
   constant_a?: number;
+  // Extensions for Measurement Window and Average
+  measurement_window_id?: string;
+  metric?: string;
+  average_mode?: AverageFunctionMode;
+  sample_count?: number;
 }
 
 export interface AutoCheckFieldRule {
@@ -288,6 +295,98 @@ export interface AutoCheckFieldRule {
   min?: number;
   max?: number;
   equals?: string | number | boolean | null;
+}
+
+export interface ReferenceDeviceCriteria {
+  reference_id?: string;
+  reference_name?: string;
+  serial_number?: string;
+  dev_eui?: string;
+  item_code: string;
+  fw_version: string;
+  fields?: string[];
+  rules?: AutoCheckFieldRule[];
+  function_rules?: AutoCheckFunctionRule[];
+}
+
+export interface MeasurementWindowConfig {
+  window_id: string;
+  name?: string;
+  device_target?: 'dut' | 'reference' | 'simulator';
+  device_identity?: string;
+  counter_field: string;
+  start_seconds?: number;
+  end_seconds?: number;
+  duration_seconds?: number;
+  min_packet_count?: number;
+  max_packet_count?: number;
+}
+
+export interface MeasurementWindowResult {
+  window_id: string;
+  name?: string;
+  device_target: 'dut' | 'reference' | 'simulator';
+  device_identity?: string;
+  counter_field: string;
+  start_counter: number;
+  end_counter: number;
+  window_packet_count: number;
+  actual_packet_count: number;
+  counter_reset_detected: boolean;
+  passed: boolean;
+  message?: string;
+}
+
+export type AverageFunctionMode = 'SAMPLE_COUNT' | 'TIME_WINDOW' | 'MEASUREMENT_WINDOW';
+
+export interface AverageFunctionConfig {
+  rule_id: string;
+  name?: string;
+  target: 'dut' | 'reference' | 'simulator';
+  device_identity?: string;
+  metric: string;
+  mode: AverageFunctionMode;
+  sample_count?: number;
+  start_seconds?: number;
+  end_seconds?: number;
+  duration_seconds?: number;
+  measurement_window_id?: string;
+  min_samples_required?: number;
+  timeout_seconds?: number;
+  deduplicate_uplinks?: boolean;
+  low_threshold?: number;
+  high_threshold?: number;
+}
+
+export interface AverageFunctionResult {
+  rule_id?: string;
+  value: number | null;
+  sample_count: number;
+  device_identity: string;
+  device_role: 'dut' | 'reference' | 'simulator';
+  metric: string;
+  measurement_ref?: string;
+  status: 'SUCCESS' | 'NO_DATA' | 'INSUFFICIENT_SAMPLES' | 'TIMEOUT' | 'INVALID_DATA';
+  passed: boolean;
+  message?: string;
+}
+
+export interface UnifiedTestProfile {
+  id?: string;
+  name: string;
+  simu_id?: string;
+  autocheck_id?: string;
+  description?: string;
+  item_code?: string;
+  fw_version?: string;
+  dut_fields?: string[];
+  reference_devices?: ReferenceDeviceCriteria[];
+  flow_blocks?: any[];
+  flow_duration_seconds?: number;
+  auto_check_criteria?: AutoCheckCriteria;
+  created_by?: string;
+  created_at?: Date | string;
+  updated_at?: Date | string;
 }
 
 export interface AutoCheckDeviceCriteria {
@@ -304,6 +403,8 @@ export interface AutoCheckTarget {
   serial_number?: string;
   packets?: DevicePacketDTO[];
   reference_packets?: DevicePacketDTO[];
+  simulator_packets?: DevicePacketDTO[];
+  multi_reference_packets?: Record<string, DevicePacketDTO[]>;
   test_start_time?: string | Date | number;
   test_end_time?: string | Date | number;
 }
@@ -311,8 +412,18 @@ export interface AutoCheckTarget {
 export interface AutoCheckCriteria {
   dut?: AutoCheckDeviceCriteria;
   reference?: AutoCheckDeviceCriteria;
-  comparisons?: { dut_field: string; reference_field: string; tolerance: number }[];
+  references?: ReferenceDeviceCriteria[];
+  simulator?: {
+    device_id?: string;
+    serial_number?: string;
+    dev_eui?: string;
+    item_code?: string;
+    fw_version?: string;
+  };
+  comparisons?: { dut_field: string; reference_field: string; tolerance: number; reference_id?: string }[];
   function_rules?: AutoCheckFunctionRule[];
+  measurement_windows?: MeasurementWindowConfig[];
+  average_rules?: AverageFunctionConfig[];
   min_rssi?: number;
   max_rssi?: number;
   min_snr?: number;
@@ -341,6 +452,8 @@ export interface AutoCheckEvaluation {
   passed_rules: number;
   failed_rules: number;
   rule_results: AutoCheckRuleResult[];
+  measurement_windows?: MeasurementWindowResult[];
+  average_results?: AverageFunctionResult[];
   evaluated_at: Date | string;
   packet_summary?: {
     raw_payload?: string;
@@ -726,8 +839,18 @@ export interface ChirpStackHttpIntegrationSetupDTO {
 // SIMULATION FLOW FUNCTION BLOCKS (3 Standard Functions: Downlink, Clear, Delay)
 // ============================================================================
 
-export type SimulationFunctionType = 'downlink' | 'clear_downlink' | 'delay';
-export type SimulationTargetDevice = 'DUT' | 'REF';
+export type SimulationFunctionType =
+  | 'downlink'
+  | 'clear_downlink'
+  | 'delay'
+  | 'wait_until_offset'
+  | 'start_measurement'
+  | 'stop_measurement'
+  | 'average'
+  | 'calculate_linear'
+  | 'device_auto_check';
+
+export type SimulationTargetDevice = 'DUT' | 'REF' | 'SIMULATOR';
 
 export interface BaseSimulationBlock {
   id?: string;
@@ -740,7 +863,7 @@ export interface DownlinkSimulationBlock extends BaseSimulationBlock {
   functionType: 'downlink';
   targetDevice: SimulationTargetDevice;
   fPort: number; // default 1
-  payloadHex: string;
+  payloadHex: string; // supports hex literal or variable template {{var}}
   isConfirmed?: boolean;
 }
 
@@ -754,28 +877,121 @@ export interface DelaySimulationBlock extends BaseSimulationBlock {
   delaySeconds: number; // Duration of delay in seconds
 }
 
+export interface WaitUntilOffsetSimulationBlock extends BaseSimulationBlock {
+  functionType: 'wait_until_offset';
+  targetOffsetSeconds: number; // Mốc thời gian tương đối tính từ Simulation Start
+}
+
+export interface StartMeasurementSimulationBlock extends BaseSimulationBlock {
+  functionType: 'start_measurement';
+  windowId: string;
+  targetDevice?: SimulationTargetDevice;
+  metric?: string;
+  counterField?: string;
+}
+
+export interface StopMeasurementSimulationBlock extends BaseSimulationBlock {
+  functionType: 'stop_measurement';
+  windowId: string;
+}
+
+export interface AverageSimulationBlock extends BaseSimulationBlock {
+  functionType: 'average';
+  windowId: string;
+  targetDevice?: SimulationTargetDevice;
+  metric: string;
+  outputVar: string;
+  minSamples?: number;
+  deduplicate?: boolean;
+}
+
+export interface CalculateLinearSimulationBlock extends BaseSimulationBlock {
+  functionType: 'calculate_linear';
+  point1: { x: string | number; y: number };
+  point2: { x: string | number; y: number };
+  outputVarA?: string;
+  outputVarB?: string;
+  outputPayloadVar?: string;
+  encoding?: 'float32_be' | 'float32_le' | 'int16' | 'raw_hex';
+  minDeltaX?: number;
+}
+
+export interface DeviceAutoCheckSimulationBlock extends BaseSimulationBlock {
+  functionType: 'device_auto_check';
+  criteriaId?: string;
+}
+
 export type SimulationFlowBlock =
   | DownlinkSimulationBlock
   | ClearDownlinkSimulationBlock
-  | DelaySimulationBlock;
+  | DelaySimulationBlock
+  | WaitUntilOffsetSimulationBlock
+  | StartMeasurementSimulationBlock
+  | StopMeasurementSimulationBlock
+  | AverageSimulationBlock
+  | CalculateLinearSimulationBlock
+  | DeviceAutoCheckSimulationBlock;
+
+/**
+ * Calculates linear calibration coefficients:
+ * y = a*x + b
+ * a = (y2 - y1) / (x2 - x1)
+ * b = y1 - a*x1
+ */
+export function calculateLinearCoefficients(
+  p1: { x: number; y: number },
+  p2: { x: number; y: number },
+  minDeltaX = 0.0001
+): { a: number; b: number; aHex: string; bHex: string; valid: boolean; error?: string } {
+  const deltaX = p2.x - p1.x;
+  if (Math.abs(deltaX) < minDeltaX) {
+    return {
+      a: 0,
+      b: 0,
+      aHex: '00000000',
+      bHex: '00000000',
+      valid: false,
+      error: `Chênh lệch giá trị raw deltaX=${deltaX} quá nhỏ (< ${minDeltaX}), không thể chia cho 0`,
+    };
+  }
+  const a = +((p2.y - p1.y) / deltaX).toFixed(6);
+  const b = +(p1.y - a * p1.x).toFixed(6);
+
+  const bufA = Buffer.alloc(4);
+  bufA.writeFloatBE(a);
+  const aHex = bufA.toString('hex').toUpperCase();
+
+  const bufB = Buffer.alloc(4);
+  bufB.writeFloatBE(b);
+  const bHex = bufB.toString('hex').toUpperCase();
+
+  return { a, b, aHex, bHex, valid: true };
+}
 
 /**
  * Calculates total duration of a flow simulation in seconds.
  * Rules:
- * - Total duration equals sum of all 'delay' blocks.
+ * - Total duration equals sum of all 'delay' blocks or max 'wait_until_offset'.
  * - 'downlink' and 'clear_downlink' blocks take 0 seconds of delay.
  */
 export function calculateFlowDurationSeconds(blocks: (SimulationFlowBlock | any)[]): number {
   if (!Array.isArray(blocks)) return 0;
-  return blocks.reduce((acc, b) => {
-    if (!b) return acc;
+  let totalDelay = 0;
+  let maxOffset = 0;
+  blocks.forEach((b) => {
+    if (!b) return;
     const fType = b.functionType || b.function_type;
     if (fType === 'delay') {
       const delay = Number(b.delaySeconds ?? b.delay_seconds ?? b.duration ?? 0);
-      return acc + (isNaN(delay) || delay < 0 ? 0 : Math.round(delay));
+      totalDelay += isNaN(delay) || delay < 0 ? 0 : Math.round(delay);
+    } else if (fType === 'wait_until_offset') {
+      const offset = Number(b.targetOffsetSeconds ?? b.target_offset_seconds ?? 0);
+      if (!isNaN(offset) && offset > maxOffset) {
+        maxOffset = Math.round(offset);
+      }
     }
-    return acc;
-  }, 0);
+  });
+  return Math.max(totalDelay, maxOffset);
 }
 
 /**
@@ -787,15 +1003,12 @@ export function flowRequiresReferenceDevice(blocks: (SimulationFlowBlock | any)[
   return blocks.some((b) => {
     if (!b) return false;
     const target = (b.targetDevice || b.target_device || '').toUpperCase();
-    return target === 'REF';
+    return target === 'REF' || target === 'REFERENCE';
   });
 }
 
 /**
- * Validates 3 standard function blocks according to specification:
- * 1. Downlink: targetDevice in ['DUT', 'REF'], fPort default 1 (valid port 1..223), payloadHex valid hex.
- * 2. Clear downlink: targetDevice in ['DUT', 'REF'].
- * 3. Delay: delaySeconds > 0.
+ * Validates function blocks according to specification:
  */
 export function validateSimulationFlowBlocks(blocks: (SimulationFlowBlock | any)[]): {
   valid: boolean;
@@ -809,6 +1022,18 @@ export function validateSimulationFlowBlocks(blocks: (SimulationFlowBlock | any)
     return { valid: false, errors: ['Flow simulation phải có ít nhất 1 function block'] };
   }
 
+  const validTypes = [
+    'downlink',
+    'clear_downlink',
+    'delay',
+    'wait_until_offset',
+    'start_measurement',
+    'stop_measurement',
+    'average',
+    'calculate_linear',
+    'device_auto_check',
+  ];
+
   blocks.forEach((b, index) => {
     const step = index + 1;
     if (!b || typeof b !== 'object') {
@@ -816,15 +1041,15 @@ export function validateSimulationFlowBlocks(blocks: (SimulationFlowBlock | any)
       return;
     }
     const fType = b.functionType || b.function_type;
-    if (!fType || !['downlink', 'clear_downlink', 'delay'].includes(fType)) {
-      errors.push(`Block #${step}: Function type '${fType}' không hợp lệ (chỉ chấp nhận 'downlink', 'clear_downlink', 'delay')`);
+    if (!fType || !validTypes.includes(fType)) {
+      errors.push(`Block #${step}: Function type '${fType}' không hợp lệ (chấp nhận: ${validTypes.join(', ')})`);
       return;
     }
 
     if (fType === 'downlink') {
       const target = (b.targetDevice || b.target_device || '').toUpperCase();
-      if (!['DUT', 'REF'].includes(target)) {
-        errors.push(`Block #${step} (Downlink): Thiết bị mục tiêu phải là 'DUT' hoặc 'REF' (nhận được: '${target}')`);
+      if (!['DUT', 'REF', 'SIMULATOR'].includes(target)) {
+        errors.push(`Block #${step} (Downlink): Thiết bị mục tiêu phải là 'DUT', 'REF', hoặc 'SIMULATOR' (nhận được: '${target}')`);
       }
       const port = Number(b.fPort ?? b.f_port ?? 1);
       if (isNaN(port) || port < 1 || port > 223) {
@@ -833,18 +1058,45 @@ export function validateSimulationFlowBlocks(blocks: (SimulationFlowBlock | any)
       const hex = (b.payloadHex || b.payload_hex || '').trim();
       if (!hex) {
         errors.push(`Block #${step} (Downlink): Payload Hex không được để trống`);
-      } else if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length % 2 !== 0) {
-        errors.push(`Block #${step} (Downlink): Payload Hex '${hex}' không đúng định dạng hex chẵn byte`);
+      } else if (!hex.includes('{{') && (!/^[0-9a-fA-F]+$/.test(hex) || hex.length % 2 !== 0)) {
+        errors.push(`Block #${step} (Downlink): Payload Hex '${hex}' không đúng định dạng hex chẵn byte hoặc template binding`);
       }
     } else if (fType === 'clear_downlink') {
       const target = (b.targetDevice || b.target_device || '').toUpperCase();
-      if (!['DUT', 'REF'].includes(target)) {
-        errors.push(`Block #${step} (Clear Downlink): Thiết bị mục tiêu phải là 'DUT' hoặc 'REF' (nhận được: '${target}')`);
+      if (!['DUT', 'REF', 'SIMULATOR'].includes(target)) {
+        errors.push(`Block #${step} (Clear Downlink): Thiết bị mục tiêu phải là 'DUT', 'REF', hoặc 'SIMULATOR' (nhận được: '${target}')`);
       }
     } else if (fType === 'delay') {
       const delay = Number(b.delaySeconds ?? b.delay_seconds ?? 0);
       if (isNaN(delay) || delay <= 0) {
         errors.push(`Block #${step} (Delay): Thời gian delay phải lớn hơn 0 giây (nhận được: ${delay})`);
+      }
+    } else if (fType === 'wait_until_offset') {
+      const offset = Number(b.targetOffsetSeconds ?? b.target_offset_seconds ?? 0);
+      if (isNaN(offset) || offset < 0) {
+        errors.push(`Block #${step} (Wait Until Offset): Target offset seconds phải >= 0`);
+      }
+    } else if (fType === 'start_measurement' || fType === 'stop_measurement') {
+      const windowId = (b.windowId || b.window_id || '').trim();
+      if (!windowId) {
+        errors.push(`Block #${step} (${fType}): windowId không được để trống`);
+      }
+    } else if (fType === 'average') {
+      const windowId = (b.windowId || b.window_id || '').trim();
+      if (!windowId) {
+        errors.push(`Block #${step} (Average): windowId không được để trống`);
+      }
+      const metric = (b.metric || '').trim();
+      if (!metric) {
+        errors.push(`Block #${step} (Average): metric không được để trống`);
+      }
+      const outputVar = (b.outputVar || b.output_var || '').trim();
+      if (!outputVar) {
+        errors.push(`Block #${step} (Average): outputVar không được để trống`);
+      }
+    } else if (fType === 'calculate_linear') {
+      if (!b.point1 || !b.point2) {
+        errors.push(`Block #${step} (Calculate Linear): Cần khai báo point1 và point2`);
       }
     }
   });

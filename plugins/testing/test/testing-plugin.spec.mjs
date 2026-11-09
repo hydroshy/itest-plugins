@@ -1172,6 +1172,136 @@ describe('Testing Plugin Tests', () => {
       assert.ok(r7 && r7.passed);
       assert.strictEqual(r7.calculated_value, 60.25);
     });
+
+    it('12. should calculate Measurement Window Packet Count and evaluate Average function across modes', async () => {
+      const service = new TestingService();
+      const baseTime = Date.now() - 300000;
+
+      const packets = [
+        {
+          id: 'pkt-w1',
+          network_id: '001BC5094052EF57',
+          f_cnt: 100,
+          rf_info: { rssi: -80, snr: 7.5 },
+          decoded_payload: { temperature: 24.0, humidity: 55.0 },
+          received_at: new Date(baseTime + 10000).toISOString(),
+        },
+        {
+          id: 'pkt-w2',
+          network_id: '001BC5094052EF57',
+          f_cnt: 105,
+          rf_info: { rssi: -78, snr: 8.0 },
+          decoded_payload: { temperature: 24.5, humidity: 56.0 },
+          received_at: new Date(baseTime + 20000).toISOString(),
+        },
+        {
+          id: 'pkt-w3',
+          network_id: '001BC5094052EF57',
+          f_cnt: 110,
+          rf_info: { rssi: -82, snr: 7.0 },
+          decoded_payload: { temperature: 25.0, humidity: 57.0 },
+          received_at: new Date(baseTime + 30000).toISOString(),
+        },
+        {
+          id: 'pkt-w4',
+          network_id: '001BC5094052EF57',
+          f_cnt: 118,
+          rf_info: { rssi: -80, snr: 8.5 },
+          decoded_payload: { temperature: 25.5, humidity: 58.0 },
+          received_at: new Date(baseTime + 40000).toISOString(),
+        },
+      ];
+
+      const criteria = {
+        dut: {
+          item_code: 'WSSFC-ATH',
+          fw_version: '4F0505',
+          rules: [],
+        },
+        references: [
+          {
+            reference_id: 'ref-1',
+            reference_name: 'Golden Reference Sensor',
+            item_code: 'WSSFC-ATH',
+            fw_version: '4F0505',
+            rules: [],
+          },
+        ],
+        measurement_windows: [
+          {
+            window_id: 'mw-dut-window',
+            name: 'DUT Measurement Window',
+            device_target: 'dut',
+            counter_field: 'f_cnt',
+            start_seconds: 5,
+            end_seconds: 45,
+            min_packet_count: 15,
+            max_packet_count: 20,
+          },
+        ],
+        average_rules: [
+          {
+            rule_id: 'avg-temp-sample',
+            name: 'AVG Temperature 3 samples',
+            target: 'dut',
+            metric: 'temperature',
+            mode: 'SAMPLE_COUNT',
+            sample_count: 3,
+            min_samples_required: 2,
+            low_threshold: 24.0,
+            high_threshold: 26.0,
+          },
+          {
+            rule_id: 'avg-rssi-time',
+            name: 'AVG RSSI in Window',
+            target: 'dut',
+            metric: 'rssi',
+            mode: 'TIME_WINDOW',
+            start_seconds: 5,
+            duration_seconds: 40,
+            low_threshold: -85,
+            high_threshold: -75,
+          },
+        ],
+      };
+
+      const evalRes = await service.evaluateAutoCheck(
+        {
+          packets,
+          test_start_time: baseTime,
+          serial_number: 'LRCR26000093',
+        },
+        criteria
+      );
+
+      assert.strictEqual(evalRes.verdict, 'PASS');
+      assert.strictEqual(evalRes.measurement_windows.length, 1);
+      const mwRes = evalRes.measurement_windows[0];
+      assert.strictEqual(mwRes.window_id, 'mw-dut-window');
+      // Start = 100, End = 118 -> Window Packet Count = 118 - 100 = 18
+      assert.strictEqual(mwRes.start_counter, 100);
+      assert.strictEqual(mwRes.end_counter, 118);
+      assert.strictEqual(mwRes.window_packet_count, 18);
+      assert.strictEqual(mwRes.passed, true);
+
+      // Verify Average evaluations
+      assert.strictEqual(evalRes.average_results.length, 2);
+      const avgTemp = evalRes.average_results.find((a) => a.rule_id === 'avg-temp-sample');
+      assert.ok(avgTemp);
+      assert.strictEqual(avgTemp.sample_count, 3);
+      // Last 3 samples: 24.5, 25.0, 25.5 -> avg = 25.0
+      assert.strictEqual(avgTemp.value, 25);
+      assert.strictEqual(avgTemp.status, 'SUCCESS');
+      assert.strictEqual(avgTemp.passed, true);
+
+      const avgRssi = evalRes.average_results.find((a) => a.rule_id === 'avg-rssi-time');
+      assert.ok(avgRssi);
+      assert.strictEqual(avgRssi.sample_count, 4);
+      // (-80 + -78 + -82 + -80) / 4 = -80.0
+      assert.strictEqual(avgRssi.value, -80);
+      assert.strictEqual(avgRssi.status, 'SUCCESS');
+      assert.strictEqual(avgRssi.passed, true);
+    });
   });
 });
 

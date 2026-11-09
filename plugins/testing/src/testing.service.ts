@@ -36,6 +36,10 @@ import {
   ChirpStackHttpIntegrationSetupDTO,
   ChirpStackHttpUplinkDTO,
   StandardDevicePayloadDTO,
+  MeasurementWindowResult,
+  MeasurementWindowConfig,
+  AverageFunctionResult,
+  AverageFunctionConfig,
 } from './testing.types';
 import { ITraceabilityProvider, DefaultTraceabilityBridge } from './testing-traceability.bridge';
 import { PacketProcessor } from './packet-processor';
@@ -610,13 +614,18 @@ export class TestingService {
       ['reference', rules.reference, references],
     ] as const) {
       if (!config) continue;
-      if (!config.item_code?.trim() || !config.fw_version?.trim() || !config.rules?.length) {
+      // Allow empty field rules if other rules (function rules, measurement windows, average rules) are defined
+      const hasOtherRules = (rules.function_rules?.length ?? 0) > 0 ||
+        (rules.measurement_windows?.length ?? 0) > 0 ||
+        (rules.average_rules?.length ?? 0) > 0 ||
+        (config.function_rules?.length ?? 0) > 0;
+      if (!config.item_code?.trim() && !config.fw_version?.trim() && !hasOtherRules) {
         throw new Error(`${side}: product and at least one field rule are required`);
       }
       if (new Set(packets.map(p => p.network_id?.toUpperCase())).size > 1) {
         throw new Error(`${side}: samples must belong to one device`);
       }
-      for (const rule of config.rules) {
+      for (const rule of config.rules || []) {
         if (!rule.field?.trim() || !Number.isInteger(rule.count) || rule.count < 1 ||
           (rule.min !== undefined && !Number.isFinite(rule.min)) ||
           (rule.max !== undefined && !Number.isFinite(rule.max)) ||
@@ -964,6 +973,273 @@ export class TestingService {
       }
     }
 
+    // --- 6. MEASUREMENT WINDOW EVALUATION ---
+    const windowResults: MeasurementWindowResult[] = [];
+    const mwConfigs: MeasurementWindowConfig[] = [
+      ...(rules.measurement_windows || []),
+    ];
+
+    for (const fRule of funcRules) {
+      if (fRule.function_name === 'MEASUREMENT_WINDOW') {
+        mwConfigs.push({
+          window_id: fRule.measurement_window_id || `mw-${fRule.parameter_name}`,
+          name: `Window for ${fRule.parameter_name}`,
+          device_target: (fRule.target as any) || 'dut',
+          counter_field: fRule.parameter_name,
+          start_seconds: typeof fRule.start_time === 'number' ? fRule.start_time : fRule.start_offset_time ?? 0,
+          duration_seconds: fRule.duration ?? 60,
+          min_packet_count: fRule.min_count,
+          max_packet_count: fRule.max_count,
+        });
+      }
+    }
+
+    const startBaseline = target.test_start_time
+      ? new Date(target.test_start_time).getTime()
+      : (target.packets && target.packets.length > 0)
+      ? new Date(target.packets[target.packets.length - 1].received_at || 0).getTime()
+      : Date.now();
+
+    for (const mw of mwConfigs) {
+      let candidatePackets: DevicePacketDTO[] = [];
+      let deviceIdentity = target.serial_number || target.dev_eui || 'DUT';
+      if (mw.device_target === 'reference') {
+        candidatePackets = target.reference_packets || [];
+        deviceIdentity = 'REFERENCE';
+      } else if (mw.device_target === 'simulator') {
+        candidatePackets = target.simulator_packets || [];
+        deviceIdentity = 'SIMULATOR';
+      } else {
+        candidatePackets = target.packets && target.packets.length > 0 ? target.packets : [packet];
+      }
+
+      const startOffset = (mw.start_seconds ?? 0) * 1000;
+      const durationMs = (mw.duration_seconds ?? ((mw.end_seconds ?? 60) - (mw.start_seconds ?? 0))) * 1000;
+      const windowStart = startBaseline + startOffset;
+      const windowEnd = windowStart + durationMs;
+
+      // Filter packets in window
+      const inWindow = candidatePackets.filter((p) => {
+        const t = new Date(p.received_at || 0).getTime();
+        return t >= windowStart && t <= windowEnd;
+      }).sort((a, b) => new Date(a.received_at || 0).getTime() - new Date(b.received_at || 0).getTime());
+
+      const getCounterVal = (p: DevicePacketDTO): number | null => {
+        const fieldName = (mw.counter_field || 'f_cnt').toLowerCase();
+        if (fieldName === 'f_cnt' || fieldName === 'fcnt' || fieldName === 'counter') {
+          return p.f_cnt != null ? Number(p.f_cnt) : null;
+        }
+        const dec = p.decoded_payload || {};
+        const key = Object.keys(dec).find((k) => k.toLowerCase() === fieldName);
+        if (key && dec[key] != null && !isNaN(Number(dec[key]))) {
+          return Number(dec[key]);
+        }
+        return p.f_cnt != null ? Number(p.f_cnt) : null;
+      };
+
+      let startCounter = 0;
+      let endCounter = 0;
+      let windowPacketCount = 0;
+      let counterResetDetected = false;
+
+      if (inWindow.length > 0) {
+        startCounter = getCounterVal(inWindow[0]) ?? 0;
+        endCounter = getCounterVal(inWindow[inWindow.length - 1]) ?? 0;
+
+        if (endCounter < startCounter) {
+          counterResetDetected = true;
+          windowPacketCount = inWindow.length;
+        } else {
+          windowPacketCount = endCounter - startCounter;
+        }
+      }
+
+      const minCount = mw.min_packet_count ?? 1;
+      const maxCount = mw.max_packet_count ?? Infinity;
+      const passed = windowPacketCount >= minCount && windowPacketCount <= maxCount;
+
+      const res: MeasurementWindowResult = {
+        window_id: mw.window_id,
+        name: mw.name,
+        device_target: mw.device_target || 'dut',
+        device_identity: deviceIdentity,
+        counter_field: mw.counter_field,
+        start_counter: startCounter,
+        end_counter: endCounter,
+        window_packet_count: windowPacketCount,
+        actual_packet_count: inWindow.length,
+        counter_reset_detected: counterResetDetected,
+        passed,
+        message: passed
+          ? `Measurement Window ${mw.window_id}: ${windowPacketCount} packets (${startCounter} -> ${endCounter}) in window [${minCount}, ${maxCount}]`
+          : `Measurement Window ${mw.window_id}: ${windowPacketCount} packets out of range [${minCount}, ${maxCount}]`,
+      };
+
+      windowResults.push(res);
+      ruleResults.push({
+        rule: `MEASUREMENT_WINDOW_${mw.window_id.toUpperCase()}`,
+        function_name: 'MEASUREMENT_WINDOW',
+        passed,
+        actual: windowPacketCount,
+        expected: `Between ${minCount} and ${maxCount} packets`,
+        calculated_value: windowPacketCount,
+        message: res.message,
+      });
+    }
+
+    // --- 7. INDEPENDENT AVERAGE FUNCTION EVALUATION ---
+    const averageResults: AverageFunctionResult[] = [];
+    const avgConfigs: AverageFunctionConfig[] = [
+      ...(rules.average_rules || []),
+    ];
+
+    for (const fRule of funcRules) {
+      if (fRule.function_name === 'CALC_AVERAGE') {
+        avgConfigs.push({
+          rule_id: `avg-${fRule.parameter_name}`,
+          name: `Average of ${fRule.parameter_name}`,
+          target: (fRule.target as any) || 'dut',
+          metric: fRule.metric || fRule.parameter_name,
+          mode: fRule.average_mode || 'SAMPLE_COUNT',
+          sample_count: fRule.sample_count || fRule.min_count || 5,
+          start_seconds: typeof fRule.start_time === 'number' ? fRule.start_time : fRule.start_offset_time,
+          duration_seconds: fRule.duration,
+          measurement_window_id: fRule.measurement_window_id,
+          low_threshold: fRule.low_threshold,
+          high_threshold: fRule.high_threshold,
+        });
+      }
+    }
+
+    for (const avgCfg of avgConfigs) {
+      let pool: DevicePacketDTO[] = [];
+      let deviceIdentity = target.serial_number || target.dev_eui || 'DUT';
+      const role = avgCfg.target || 'dut';
+
+      if (role === 'reference') {
+        pool = target.reference_packets || [];
+        deviceIdentity = 'REFERENCE';
+      } else if (role === 'simulator') {
+        pool = target.simulator_packets || [];
+        deviceIdentity = 'SIMULATOR';
+      } else {
+        pool = target.packets && target.packets.length > 0 ? target.packets : [packet];
+      }
+
+      // Deduplicate uplinks if required
+      if (avgCfg.deduplicate_uplinks) {
+        const seen = new Set<string>();
+        pool = pool.filter((p) => {
+          const key = `${p.network_id || ''}-${p.f_cnt ?? p.raw_payload ?? ''}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      let selectedPackets: DevicePacketDTO[] = [];
+      if (avgCfg.mode === 'TIME_WINDOW') {
+        const startSec = avgCfg.start_seconds ?? 0;
+        const durSec = avgCfg.duration_seconds ?? 300;
+        const winStart = startBaseline + startSec * 1000;
+        const winEnd = winStart + durSec * 1000;
+        selectedPackets = pool.filter((p) => {
+          const t = new Date(p.received_at || 0).getTime();
+          return t >= winStart && t <= winEnd;
+        });
+      } else if (avgCfg.mode === 'MEASUREMENT_WINDOW') {
+        const matchedWin = windowResults.find((w) => w.window_id === avgCfg.measurement_window_id);
+        if (matchedWin) {
+          // Use timing from matched window
+          const mwDef = mwConfigs.find((m) => m.window_id === avgCfg.measurement_window_id);
+          const startSec = mwDef?.start_seconds ?? 0;
+          const durSec = mwDef?.duration_seconds ?? 60;
+          const winStart = startBaseline + startSec * 1000;
+          const winEnd = winStart + durSec * 1000;
+          selectedPackets = pool.filter((p) => {
+            const t = new Date(p.received_at || 0).getTime();
+            return t >= winStart && t <= winEnd;
+          });
+        } else {
+          selectedPackets = pool;
+        }
+      } else {
+        // SAMPLE_COUNT (default)
+        const count = avgCfg.sample_count ?? 10;
+        selectedPackets = pool.slice(-count);
+      }
+
+      // Extract metric values
+      const metricName = avgCfg.metric.toLowerCase();
+      const metricValues: number[] = [];
+
+      for (const p of selectedPackets) {
+        let val: number | null = null;
+        if (metricName === 'rssi' && p.rf_info?.rssi != null) val = Number(p.rf_info.rssi);
+        else if (metricName === 'snr' && p.rf_info?.snr != null) val = Number(p.rf_info.snr);
+        else {
+          const dec = p.decoded_payload || {};
+          const key = Object.keys(dec).find((k) => k.toLowerCase() === metricName);
+          if (key && dec[key] != null && !isNaN(Number(dec[key]))) {
+            val = Number(dec[key]);
+          }
+        }
+        if (val !== null && Number.isFinite(val)) {
+          metricValues.push(val);
+        }
+      }
+
+      let status: AverageFunctionResult['status'] = 'SUCCESS';
+      let avgValue: number | null = null;
+      let passed = true;
+      let message = '';
+
+      const minReq = avgCfg.min_samples_required ?? 1;
+
+      if (metricValues.length === 0) {
+        status = 'NO_DATA';
+        passed = false;
+        message = `Average(${avgCfg.metric}) trên ${role}: Không có mẫu dữ liệu nào`;
+      } else if (metricValues.length < minReq) {
+        status = 'INSUFFICIENT_SAMPLES';
+        passed = false;
+        avgValue = +(metricValues.reduce((a, b) => a + b, 0) / metricValues.length).toFixed(3);
+        message = `Average(${avgCfg.metric}) trên ${role}: Chỉ có ${metricValues.length} mẫu, yêu cầu tối thiểu ${minReq}`;
+      } else {
+        avgValue = +(metricValues.reduce((a, b) => a + b, 0) / metricValues.length).toFixed(3);
+        const low = avgCfg.low_threshold ?? -Infinity;
+        const high = avgCfg.high_threshold ?? Infinity;
+        passed = avgValue >= low && avgValue <= high;
+        message = passed
+          ? `Average(${avgCfg.metric}) trên ${role} = ${avgValue} (${metricValues.length} mẫu) đạt chuẩn [${low}, ${high}]`
+          : `Average(${avgCfg.metric}) trên ${role} = ${avgValue} (${metricValues.length} mẫu) ngoài ngưỡng [${low}, ${high}]`;
+      }
+
+      const avgRes: AverageFunctionResult = {
+        rule_id: avgCfg.rule_id,
+        value: avgValue,
+        sample_count: metricValues.length,
+        device_identity: deviceIdentity,
+        device_role: role,
+        metric: avgCfg.metric,
+        measurement_ref: avgCfg.measurement_window_id,
+        status,
+        passed,
+        message,
+      };
+
+      averageResults.push(avgRes);
+      ruleResults.push({
+        rule: `CALC_AVG_${role.toUpperCase()}_${avgCfg.metric.toUpperCase()}`,
+        function_name: 'CALC_AVERAGE',
+        passed,
+        actual: avgValue !== null ? avgValue : status,
+        expected: `${avgCfg.low_threshold ?? -Infinity} <= AVG <= ${avgCfg.high_threshold ?? Infinity}`,
+        calculated_value: avgValue !== null ? avgValue : undefined,
+        message,
+      });
+    }
+
     const passedCount = ruleResults.filter((r) => r.passed).length;
     const failedCount = ruleResults.length - passedCount;
     const verdict = failedCount === 0 ? 'PASS' : 'FAIL';
@@ -983,6 +1259,8 @@ export class TestingService {
       passed_rules: passedCount,
       failed_rules: failedCount,
       rule_results: ruleResults,
+      measurement_windows: windowResults,
+      average_results: averageResults,
       evaluated_at: new Date().toISOString(),
       packet_summary: {
         raw_payload: packet.raw_payload,
