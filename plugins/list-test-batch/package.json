@@ -1,0 +1,14 @@
+{
+  "name": "@universal-iot/plugin-list-test-batch",
+  "version": "1.0.0",
+  "description": "Quản lý và tra cứu danh sách các đợt kiểm thử hàng loạt (Test Batch), theo dõi trạng thái thực thi, thiết bị test và kết quả đánh giá (Verdict)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/list-test-batch.spec.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

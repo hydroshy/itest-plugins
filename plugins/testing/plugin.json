@@ -68,6 +68,16 @@
       "namespace": "testing",
       "resource": "create-test-batch",
       "action": "manage"
+    },
+    {
+      "namespace": "testing",
+      "resource": "list-test-batch",
+      "action": "view"
+    },
+    {
+      "namespace": "testing",
+      "resource": "list-test-batch",
+      "action": "manage"
     }
   ],
   "ui": {

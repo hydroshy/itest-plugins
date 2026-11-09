@@ -1,0 +1,24 @@
+{
+  "id": "list-test-batch",
+  "name": "List Test Batch Plugin",
+  "version": "1.0.0",
+  "type": "APPLICATION",
+  "description": "Quản lý và tra cứu danh sách các đợt kiểm thử hàng loạt (Test Batch), theo dõi tiến độ thực thi, thiết bị test, thiết bị tham chiếu và kết quả đánh giá (Verdict).",
+  "author": "ITEST Platform Team",
+  "license": "UNLICENSED",
+  "entry": "dist/index.js",
+  "database": {
+    "schemaName": "system_schema",
+    "tables": [
+      "device_test_batches",
+      "device_test_batch_devices",
+      "device_test_batch_executions"
+    ]
+  },
+  "capabilities": {
+    "batchListing": true,
+    "batchFiltering": true,
+    "executionTracking": true,
+    "safeDelete": true
+  }
+}

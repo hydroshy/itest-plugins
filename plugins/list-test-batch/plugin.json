@@ -1,0 +1,40 @@
+{
+  "id": "list-test-batch",
+  "name": "List Test Batch",
+  "version": "1.0.0",
+  "sdkVersion": "^1.0.0",
+  "type": "HYBRID",
+  "description": "Quản lý và tra cứu danh sách các đợt kiểm thử hàng loạt (Test Batch), theo dõi tiến độ thực thi, thiết bị test, thiết bị tham chiếu và kết quả đánh giá (Verdict).",
+  "author": "ITEST Platform Team",
+  "entry": "dist/index.js",
+  "enabledByDefault": true,
+  "permissions": [
+    {
+      "namespace": "testing",
+      "resource": "list-test-batch",
+      "action": "view"
+    },
+    {
+      "namespace": "testing",
+      "resource": "list-test-batch",
+      "action": "manage"
+    },
+    {
+      "namespace": "testing",
+      "resource": "test-batch",
+      "action": "view"
+    },
+    {
+      "namespace": "testing",
+      "resource": "test-batch",
+      "action": "manage"
+    }
+  ],
+  "ui": {
+    "title": "LIST TEST BATCH",
+    "icon": "ListFilter",
+    "route": "/plugins/testing?tab=list-test-batch",
+    "component": "ListTestBatchView",
+    "slot": "main-navigation"
+  }
+}
