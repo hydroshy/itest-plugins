@@ -49,7 +49,28 @@ describe('Simulation Flow 3 Standard Blocks (Downlink, Clear Downlink, Delay)', 
       assert.match(res.errors[1], /reboot_cmd/);
     });
 
-    it('should reject downlink or clear_downlink targeting invalid devices (only DUT or REF allowed)', () => {
+    it('should reject downlink or clear_downlink targeting empty device', () => {
+      const blocks = [
+        {
+          functionType: 'downlink',
+          targetDevice: '',
+          fPort: 1,
+          payloadHex: 'AABB',
+        },
+        {
+          functionType: 'clear_downlink',
+          targetDevice: '   ',
+        },
+      ];
+
+      const res = validateSimulationFlowBlocks(blocks);
+      assert.strictEqual(res.valid, false);
+      assert.strictEqual(res.errors.length, 2);
+      assert.match(res.errors[0], /không được để trống/);
+      assert.match(res.errors[1], /không được để trống/);
+    });
+
+    it('should accept downlink or clear_downlink targeting specific device by name', () => {
       const blocks = [
         {
           functionType: 'downlink',
@@ -59,15 +80,13 @@ describe('Simulation Flow 3 Standard Blocks (Downlink, Clear Downlink, Delay)', 
         },
         {
           functionType: 'clear_downlink',
-          targetDevice: 'UNKNOWN_TARGET',
+          targetDevice: 'REF_SENSOR_TEMPERATURE',
         },
       ];
 
       const res = validateSimulationFlowBlocks(blocks);
-      assert.strictEqual(res.valid, false);
-      assert.strictEqual(res.errors.length, 2);
-      assert.match(res.errors[0], /DUT.*REF/);
-      assert.match(res.errors[1], /DUT.*REF/);
+      assert.strictEqual(res.valid, true);
+      assert.strictEqual(res.errors.length, 0);
     });
 
     it('should validate downlink fPort range 1..223 and valid hex payload', () => {

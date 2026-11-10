@@ -850,7 +850,7 @@ export type SimulationFunctionType =
   | 'calculate_linear'
   | 'device_auto_check';
 
-export type SimulationTargetDevice = 'DUT' | 'REF' | 'SIMULATOR';
+export type SimulationTargetDevice = 'DUT' | 'REF' | 'SIMULATOR' | string;
 
 export interface BaseSimulationBlock {
   id?: string;
@@ -1047,9 +1047,9 @@ export function validateSimulationFlowBlocks(blocks: (SimulationFlowBlock | any)
     }
 
     if (fType === 'downlink') {
-      const target = (b.targetDevice || b.target_device || '').toUpperCase();
-      if (!['DUT', 'REF', 'SIMULATOR'].includes(target)) {
-        errors.push(`Block #${step} (Downlink): Thiết bị mục tiêu phải là 'DUT', 'REF', hoặc 'SIMULATOR' (nhận được: '${target}')`);
+      const target = (b.targetDevice || b.target_device || '').toString().trim();
+      if (!target) {
+        errors.push(`Block #${step} (Downlink): Thiết bị mục tiêu / Tên thiết bị không được để trống`);
       }
       const port = Number(b.fPort ?? b.f_port ?? 1);
       if (isNaN(port) || port < 1 || port > 223) {
@@ -1062,9 +1062,9 @@ export function validateSimulationFlowBlocks(blocks: (SimulationFlowBlock | any)
         errors.push(`Block #${step} (Downlink): Payload Hex '${hex}' không đúng định dạng hex chẵn byte hoặc template binding`);
       }
     } else if (fType === 'clear_downlink') {
-      const target = (b.targetDevice || b.target_device || '').toUpperCase();
-      if (!['DUT', 'REF', 'SIMULATOR'].includes(target)) {
-        errors.push(`Block #${step} (Clear Downlink): Thiết bị mục tiêu phải là 'DUT', 'REF', hoặc 'SIMULATOR' (nhận được: '${target}')`);
+      const target = (b.targetDevice || b.target_device || '').toString().trim();
+      if (!target) {
+        errors.push(`Block #${step} (Clear Downlink): Thiết bị mục tiêu / Tên thiết bị không được để trống`);
       }
     } else if (fType === 'delay') {
       const delay = Number(b.delaySeconds ?? b.delay_seconds ?? 0);
