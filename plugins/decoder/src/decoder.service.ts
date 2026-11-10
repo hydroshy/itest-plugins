@@ -14,7 +14,7 @@ import {
 import { LoRaWANScriptRunner } from './lorawan-script-runner';
 import { DefaultMemmapBridge, IMemmapBridge } from './decoder-memmap.bridge';
 
-export const FW_VERSION_REGEX = /^[0-9]F[0-9]{4}$/;
+export const FW_VERSION_REGEX = /^[0-9]+F[0-9]+$/i;
 
 export class DecoderService {
   private scripts: Map<string, DecoderScript> = new Map();
@@ -41,7 +41,7 @@ export class DecoderService {
     const rawFwVer = (dto.fw_version || '').trim();
     if (rawFwVer && (rawFwVer.includes('F') || rawFwVer.length > 2)) {
       if (!FW_VERSION_REGEX.test(rawFwVer)) {
-        throw new Error(`Định dạng FW_VERSION không hợp lệ: '${rawFwVer}'. Định dạng chuẩn là XFXXXX (X là số, ví dụ 0F0001).`);
+        throw new Error(`Định dạng FW_VERSION không hợp lệ: '${rawFwVer}'. Định dạng chuẩn là XXFXXXX (X là số, ví dụ 4F0505, 32F0505).`);
       }
     }
 

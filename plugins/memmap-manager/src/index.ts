@@ -68,7 +68,7 @@ export interface MemmapProfileInput {
   registers: MemmapRegister[];
 }
 
-export const FW_VERSION_REGEX = /^[0-9]F[0-9]{4}$/;
+export const FW_VERSION_REGEX = /^[0-9]+F[0-9]+$/i;
 
 export interface MemmapImportError {
   row?: number;
