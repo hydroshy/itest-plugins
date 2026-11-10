@@ -89,6 +89,7 @@
   },
   "defaultConfig": {
     "chirpstackServerUrl": "http://chirpstack:8080",
+    "chirpstackWebhookUrl": "http://127.0.0.1:3000/api/v1/lorawan/chirpstack/uplink",
     "maxPacketsRetentionDays": 30,
     "enableLivePacketsStream": true
   }
