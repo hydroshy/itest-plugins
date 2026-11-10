@@ -6,6 +6,7 @@ export interface ChirpStackNetworkServer {
   /** Optional when registering the ChirpStack server; tenants are managed separately. */
   tenantId?: string;
   applicationId?: string;
+  simulationApplicationId?: string;
   deviceProfileId?: string;
   version: string;
   status: 'online' | 'offline' | 'untested';
@@ -120,6 +121,7 @@ export interface CreateNetworkServerDto {
   /** Tenant selection belongs to TenantService and is optional for server registration. */
   tenantId?: string;
   applicationId?: string;
+  simulationApplicationId?: string;
   deviceProfileId?: string;
 }
 
@@ -129,6 +131,7 @@ export interface UpdateNetworkServerDto {
   apiToken?: string;
   tenantId?: string;
   applicationId?: string;
+  simulationApplicationId?: string;
   deviceProfileId?: string;
 }
 

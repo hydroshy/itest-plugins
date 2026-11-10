@@ -164,6 +164,7 @@ export class LoRaWanChirpStackService {
       apiToken: requireString('apiToken', dto?.apiToken),
       tenantId: typeof dto?.tenantId === 'string' ? dto.tenantId.trim() : '',
       applicationId: typeof dto?.applicationId === 'string' ? dto.applicationId.trim() : '',
+      simulationApplicationId: typeof dto?.simulationApplicationId === 'string' ? dto.simulationApplicationId.trim() : '',
       deviceProfileId: typeof dto?.deviceProfileId === 'string' ? dto.deviceProfileId.trim() : '',
       version: 'ChirpStack v4',
       status: 'untested',
@@ -195,6 +196,7 @@ export class LoRaWanChirpStackService {
     if (dto.apiToken !== undefined) server.apiToken = String(dto.apiToken).trim();
     if (dto.tenantId !== undefined) server.tenantId = String(dto.tenantId).trim();
     if (dto.applicationId !== undefined) server.applicationId = String(dto.applicationId).trim();
+    if (dto.simulationApplicationId !== undefined) server.simulationApplicationId = String(dto.simulationApplicationId).trim();
     if (dto.deviceProfileId !== undefined) server.deviceProfileId = String(dto.deviceProfileId).trim();
     return server;
   }
