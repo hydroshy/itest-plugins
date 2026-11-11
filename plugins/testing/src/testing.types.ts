@@ -848,6 +848,7 @@ export type SimulationFunctionType =
   | 'stop_measurement'
   | 'average'
   | 'calculate_linear'
+  | 'convert_to_hex'
   | 'device_auto_check';
 
 export type SimulationTargetDevice = 'DUT' | 'REF' | 'SIMULATOR' | string;
@@ -916,6 +917,13 @@ export interface CalculateLinearSimulationBlock extends BaseSimulationBlock {
   minDeltaX?: number;
 }
 
+export interface ConvertToHexSimulationBlock extends BaseSimulationBlock {
+  functionType: 'convert_to_hex';
+  sourceVar: string;
+  dataType?: 'float32_be' | 'float32_le' | 'int16' | 'int32' | 'uint16' | 'uint32' | 'raw_hex';
+  outputVar: string;
+}
+
 export interface DeviceAutoCheckSimulationBlock extends BaseSimulationBlock {
   functionType: 'device_auto_check';
   criteriaId?: string;
@@ -930,6 +938,7 @@ export type SimulationFlowBlock =
   | StopMeasurementSimulationBlock
   | AverageSimulationBlock
   | CalculateLinearSimulationBlock
+  | ConvertToHexSimulationBlock
   | DeviceAutoCheckSimulationBlock;
 
 /**
@@ -1031,6 +1040,7 @@ export function validateSimulationFlowBlocks(blocks: (SimulationFlowBlock | any)
     'stop_measurement',
     'average',
     'calculate_linear',
+    'convert_to_hex',
     'device_auto_check',
   ];
 
@@ -1097,6 +1107,15 @@ export function validateSimulationFlowBlocks(blocks: (SimulationFlowBlock | any)
     } else if (fType === 'calculate_linear') {
       if (!b.point1 || !b.point2) {
         errors.push(`Block #${step} (Calculate Linear): Cần khai báo point1 và point2`);
+      }
+    } else if (fType === 'convert_to_hex') {
+      const src = (b.sourceVar || b.source_var || '').trim();
+      const out = (b.outputVar || b.output_var || '').trim();
+      if (!src) {
+        errors.push(`Block #${step} (Convert To Hex): Biến nguồn (sourceVar) không được để trống`);
+      }
+      if (!out) {
+        errors.push(`Block #${step} (Convert To Hex): Biến đầu ra (outputVar) không được để trống`);
       }
     }
   });
