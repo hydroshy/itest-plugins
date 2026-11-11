@@ -228,5 +228,25 @@ describe('Simulation Flow 3 Standard Blocks (Downlink, Clear Downlink, Delay)', 
       assert.strictEqual(failRes.valid, false);
       assert.ok(failRes.error);
     });
+
+    it('should validate convert_to_hex block and reject missing sourceVar or outputVar', () => {
+      const validBlocks = [
+        { functionType: 'convert_to_hex', sourceVar: 'a', dataType: 'float32_be', outputVar: 'x' },
+        { functionType: 'downlink', targetDevice: 'DUT', fPort: 1, payloadHex: '4E04{{x}}0005' },
+      ];
+      const res = validateSimulationFlowBlocks(validBlocks);
+      assert.strictEqual(res.valid, true);
+      assert.strictEqual(res.errors.length, 0);
+
+      const invalidBlocks = [
+        { functionType: 'convert_to_hex', sourceVar: '', outputVar: 'x' },
+        { functionType: 'convert_to_hex', sourceVar: 'a', outputVar: '' },
+      ];
+      const failRes = validateSimulationFlowBlocks(invalidBlocks);
+      assert.strictEqual(failRes.valid, false);
+      assert.strictEqual(failRes.errors.length, 2);
+      assert.match(failRes.errors[0], /sourceVar/);
+      assert.match(failRes.errors[1], /outputVar/);
+    });
   });
 });
