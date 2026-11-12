@@ -211,6 +211,13 @@ describe('Simulation Flow 3 Standard Blocks (Downlink, Clear Downlink, Delay)', 
       assert.strictEqual(duration, 1200);
     });
 
+    it('accepts builder and legacy linear fields including zero, and rejects missing coordinates', () => {
+      const block = { functionType: 'calculate_linear', point1X: 0, point1Y: 0, point2X: '{{x2}}', point2Y: 20 };
+      assert.strictEqual(validateSimulationFlowBlocks([block]).valid, true);
+      assert.strictEqual(validateSimulationFlowBlocks([{ functionType: 'calculate_linear', x1: 0, y1: 0, x2: 1, y2: 20 }]).valid, true);
+      assert.strictEqual(validateSimulationFlowBlocks([{ ...block, point1Y: undefined }]).valid, false);
+    });
+
     it('should correctly calculate linear coefficients y = a*x + b and encode IEEE-754 hex', () => {
       // Point 1: raw x1 = 100, standard y1 = 0 ppm
       // Point 2: raw x2 = 500, standard y2 = 20 ppm

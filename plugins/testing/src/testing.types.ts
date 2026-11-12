@@ -1105,8 +1105,16 @@ export function validateSimulationFlowBlocks(blocks: (SimulationFlowBlock | any)
         errors.push(`Block #${step} (Average): outputVar không được để trống`);
       }
     } else if (fType === 'calculate_linear') {
-      if (!b.point1 || !b.point2) {
-        errors.push(`Block #${step} (Calculate Linear): Cần khai báo point1 và point2`);
+      const values = [
+        b.point1?.x ?? b.point1X ?? b.x1,
+        b.point1?.y ?? b.point1Y ?? b.y1,
+        b.point2?.x ?? b.point2X ?? b.x2,
+        b.point2?.y ?? b.point2Y ?? b.y2,
+      ];
+      if (values.some((value) => value === undefined || value === null || value === '' ||
+        (typeof value === 'string' && !value.trim()) ||
+        (typeof value === 'number' && !Number.isFinite(value)))) {
+        errors.push(`Block #${step} (Calculate Linear): Cần khai báo đủ x1, y1, x2, y2`);
       }
     } else if (fType === 'convert_to_hex') {
       const src = (b.sourceVar || b.source_var || '').trim();
