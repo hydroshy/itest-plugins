@@ -969,11 +969,12 @@ async function confirmRemoveServer(id: string) {
 async function testServer(id: string) {
   testingId.value = id;
   try {
-    const res = await request<{ ok: boolean; version?: string }>(`/servers/${id}/test`, { method: 'POST' });
-    if (res.ok) {
-      cyberToast.success(`Kết nối thành công! Phiên bản: ${res.version || 'v4'}`);
+    const res = await request<{ ok?: boolean; success?: boolean; version?: string; message?: string }>(`/servers/${id}/test`, { method: 'POST' });
+    const isSuccess = res.success ?? res.ok ?? false;
+    if (isSuccess) {
+      cyberToast.success(res.message || `Kết nối thành công! Phiên bản: ${res.version || 'v4'}`);
     } else {
-      cyberToast.error('Kết nối thất bại');
+      cyberToast.error(res.message || 'Kết nối thất bại');
     }
     await refreshAll();
   } catch (error) {

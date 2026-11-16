@@ -29,7 +29,10 @@ export class ChirpStackApiClient {
   }
 
   private cleanUrl(url: string, path: string): string {
-    const base = (url || '').replace(/\/+$/, '');
+    let base = (url || '').trim().replace(/\/+$/, '');
+    if (base && !base.startsWith('http://') && !base.startsWith('https://')) {
+      base = `http://${base}`;
+    }
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     return `${base}${cleanPath}`;
   }
@@ -50,17 +53,34 @@ export class ChirpStackApiClient {
   /**
    * Test Network Server Connection
    */
-  async testConnection(server: ChirpStackNetworkServer): Promise<{ success: boolean; version?: string; message: string }> {
+  async testConnection(server: ChirpStackNetworkServer): Promise<{ success: boolean; ok: boolean; version?: string; message: string }> {
     try {
-      const url = this.cleanUrl(server.apiUrl, `/api/gateways?limit=1&tenantId=${encodeURIComponent(server.tenantId || '')}`);
-      const res = await this.safeFetch(url, {
+      const targetTenantId = (server.tenantId || '').trim();
+      const testUrl = targetTenantId
+        ? this.cleanUrl(server.apiUrl, `/api/gateways?limit=1&tenantId=${encodeURIComponent(targetTenantId)}`)
+        : this.cleanUrl(server.apiUrl, `/api/tenants?limit=1`);
+
+      let res = await this.safeFetch(testUrl, {
         method: 'GET',
         headers: this.getHeaders(server.apiToken),
       });
 
+      // If gateway query failed with 400 (e.g. invalid tenantId format or empty tenantId), fallback to tenants query
+      if (!res.ok && targetTenantId && res.status === 400) {
+        const fallbackUrl = this.cleanUrl(server.apiUrl, `/api/tenants?limit=1`);
+        const fallbackRes = await this.safeFetch(fallbackUrl, {
+          method: 'GET',
+          headers: this.getHeaders(server.apiToken),
+        });
+        if (fallbackRes.ok) {
+          res = fallbackRes;
+        }
+      }
+
       if (res.ok) {
         return {
           success: true,
+          ok: true,
           version: 'ChirpStack v4',
           message: 'Kết nối API ChirpStack thành công (HTTP 200 OK)',
         };
@@ -69,18 +89,21 @@ export class ChirpStackApiClient {
       if (res.status === 401 || res.status === 403) {
         return {
           success: false,
+          ok: false,
           message: `Xác thực thất bại: API Token không hợp lệ hoặc thiếu quyền (HTTP ${res.status})`,
         };
       }
 
       return {
         success: false,
+        ok: false,
         message: `Máy chủ phản hồi mã lỗi: HTTP ${res.status} ${res.statusText}`,
       };
     } catch (err: any) {
       const isAbort = err.name === 'AbortError' || err.message?.includes('aborted');
       return {
         success: false,
+        ok: false,
         message: isAbort
           ? `Hết thời gian kết nối (Timeout > ${this.timeoutMs}ms)`
           : `Không thể kết nối đến máy chủ: ${err.message}`,
