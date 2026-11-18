@@ -73,6 +73,28 @@ export class ATHRegisterDecoder {
   }
 
   /**
+   * Giải mã thanh ghi 85 sang class LoRaWAN ('A', 'B', hoặc 'C')
+   */
+  static decodeDeviceClass(bytes: number[] | Uint8Array): string {
+    const str = this.bytesToString(bytes).toUpperCase().replace(/^CLASS[_\s-]?/, '').trim();
+    if (['A', 'B', 'C'].includes(str)) {
+      return str;
+    }
+    const arr = Array.from(bytes || []);
+    if (arr.length >= 2) {
+      const num16 = (arr[0] << 8) | arr[1];
+      if (num16 === 2 || arr[0] === 2 || arr[1] === 2) return 'C';
+      if (num16 === 1 || arr[0] === 1 || arr[1] === 1) return 'B';
+      if (num16 === 0 || arr[0] === 0 || arr[1] === 0) return 'A';
+    } else if (arr.length === 1) {
+      if (arr[0] === 2) return 'C';
+      if (arr[0] === 1) return 'B';
+      if (arr[0] === 0) return 'A';
+    }
+    return str || 'A';
+  }
+
+  /**
    * Trích xuất các byte từ rawMemory map (key là địa chỉ thanh ghi, value là [highByte, lowByte])
    */
   static extractBytes(
@@ -120,7 +142,7 @@ export class ATHRegisterDecoder {
       appEui: this.bytesToHex(appEuiBytes),
       appKey: this.bytesToHex(appKeyBytes),
       regionCode: this.bytesToString(regionCodeBytes) || 'AS923-1',
-      deviceClass: this.bytesToString(classBytes) || 'A',
+      deviceClass: this.decodeDeviceClass(classBytes),
       sensorType: this.bytesToUint16(sensorTypeBytes),
       serialNumber: this.bytesToString(serialBytes),
       itemCode: this.bytesToString(itemCodeBytes),
