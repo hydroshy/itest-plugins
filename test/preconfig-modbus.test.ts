@@ -1,11 +1,14 @@
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
-import {
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const {
   createContiguousChunks,
   calculateModbusCrc16,
   verifyReadBackValues,
   PreconfigManagerService,
-} from '../plugins/preconfig-manager/src/index.ts';
+} = require('../plugins/preconfig-manager/dist/index.js');
 
 describe('Preconfig Modbus Chunking & Verification Engine', () => {
   it('calculates standard Modbus CRC16 correctly', () => {
