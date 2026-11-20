@@ -1,0 +1,21 @@
+{
+  "id": "preconfig-manager",
+  "name": "Preconfig Manager",
+  "version": "1.0.0",
+  "type": "application",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "preconfig-modbus-chunking",
+    "preconfig-read-back-verify",
+    "schema-validation"
+  ],
+  "permissions": [
+    "config:read",
+    "config:write"
+  ],
+  "ui": {
+    "component": "PreconfigManagerView",
+    "slot": "settings"
+  },
+  "description": "Preconfiguration Manager for IoT Devices: Modbus FC 16 contiguous chunking, batch write and read-back verification."
+}

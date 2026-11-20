@@ -1,0 +1,14 @@
+{
+  "name": "@iot-plugin/preconfig-manager",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Preconfiguration Manager for IoT Devices with Modbus FC 16 Contiguous Chunking & Read-back Verification",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@iot-platform/plugin-sdk": "workspace:*"
+  }
+}
