@@ -68,7 +68,7 @@ export interface MemmapProfileInput {
   registers: MemmapRegister[];
 }
 
-export const FW_VERSION_REGEX = /^[0-9]+F[0-9]+$/i;
+export const FW_VERSION_REGEX = /^[0-9]+F[0-9]+$/;
 
 export interface MemmapImportError {
   row?: number;
@@ -141,9 +141,10 @@ export class MemmapManagerService {
     if (!name) errors.push({ field: 'name', message: 'Profile name is required' });
 
     const itemCode = this.asString(source.itemCode ?? source.item_code ?? source.ITEM_CODE);
-    const fwVersion = this.asString(source.fwVersion ?? source.fw_version ?? source.FW_VERSION);
+    const rawFw = this.asString(source.fwVersion ?? source.fw_version ?? source.FW_VERSION);
+    const fwVersion = rawFw ? rawFw.trim().toUpperCase() : undefined;
     if (fwVersion && !FW_VERSION_REGEX.test(fwVersion)) {
-      errors.push({ field: 'fwVersion', message: 'FW_VERSION must match format XFXXXX (X is a digit, e.g. 1F0001)' });
+      errors.push({ field: 'fwVersion', message: 'FW_VERSION must match format XXFXXXX (X is a digit, F is uppercase, e.g. 01F0001, 4F0505)' });
     }
 
     const registers: MemmapRegister[] = [];
